@@ -14,13 +14,13 @@
         <td>
             <strong>{{ m.name }}</strong> ({{ m.phone }})<br>
             <small style="color:#666;">Shobha: {{ m.profession or '-' }} | Income: {{ m.monthly_income or '-' }}</small><br>
-            <small style="color:#666;">Ref: {{ m.referred_by or '-' }}</small>
+            <small style="color:#666;">Password: {{ m.plain_password or 'Phone Number' }}</small>
         </td>
         <td>Rs. {{ m.preferred_amount }}</td>
         <td>
-            {% if m.selfie %}<a href="/static/uploads/{{ m.selfie }}" target="_blank" class="btn btn-success" style="padding:3px 8px;font-size:11px;margin-bottom:2px;">Selfie</a>{% endif %}
-            {% if m.cnic_front %}<a href="/static/uploads/{{ m.cnic_front }}" target="_blank" class="btn btn-secondary" style="padding:3px 8px;font-size:11px;margin-bottom:2px;">CNIC Front</a>{% endif %}
-            {% if m.cnic_back %}<a href="/static/uploads/{{ m.cnic_back }}" target="_blank" class="btn btn-secondary" style="padding:3px 8px;font-size:11px;margin-bottom:2px;">CNIC Back</a>{% endif %}
+            {% if m.selfie %}<a href="{{ url_for('view_image', filename=m.selfie) }}" target="_blank" class="btn btn-success" style="padding:3px 8px;font-size:11px;margin-bottom:2px;">Selfie</a>{% endif %}
+            {% if m.cnic_front %}<a href="{{ url_for('view_image', filename=m.cnic_front) }}" target="_blank" class="btn btn-secondary" style="padding:3px 8px;font-size:11px;margin-bottom:2px;">CNIC Front</a>{% endif %}
+            {% if m.cnic_back %}<a href="{{ url_for('view_image', filename=m.cnic_back) }}" target="_blank" class="btn btn-secondary" style="padding:3px 8px;font-size:11px;margin-bottom:2px;">CNIC Back</a>{% endif %}
         </td>
         <td>
             <a href="{{ url_for('approve_member', mid=m.id) }}" class="btn btn-success" style="padding:5px 10px;font-size:12px;margin-bottom:2px;">Approve</a><br>
@@ -55,13 +55,22 @@
 
 <div class="card">
 {% if members %}
-<table><thead><tr><th>Naam</th><th>Phone</th><th>Qist</th><th>Trust</th><th>Status</th><th>Action</th></tr></thead>
+<table><thead><tr><th>Naam</th><th>Phone</th><th>Password</th><th>Status</th><th>Actions</th></tr></thead>
 <tbody>{% for m in members %}
 <tr>
-<td>{{ m.name }}</td><td>{{ m.phone }}</td><td>Rs. {{ m.preferred_amount or '-' }}</td>
-<td>{{ m.trust_score }}/100</td>
+<td>{{ m.name }}</td>
+<td>{{ m.phone }}</td>
+<td>
+    <strong>{{ m.plain_password or m.phone }}</strong><br>
+    <form method="POST" action="{{ url_for('admin_reset_password', mid=m.id) }}" style="display:flex; margin-top:5px;">
+        <input type="text" name="new_password" placeholder="Naya Password" required style="width:100px; padding:2px; font-size:11px;">
+        <button type="submit" class="btn btn-secondary" style="padding:2px 5px; font-size:11px; margin-left:2px;">Reset</button>
+    </form>
+</td>
 <td>{% if m.verified %}<span class="badge badge-verified">Verified</span>{% else %}<span class="badge badge-pending">Pending</span>{% endif %}</td>
-<td>{% if not m.verified %}<a href="{{ url_for('verify_member', mid=m.id) }}" class="btn btn-success" style="padding:5px 10px;font-size:12px;">Verify</a>{% endif %}</td>
+<td>
+    {% if not m.verified %}<a href="{{ url_for('verify_member', mid=m.id) }}" class="btn btn-success" style="padding:5px 10px;font-size:12px;">Verify</a>{% endif %}
+</td>
 </tr>{% endfor %}
 </tbody></table>
 {% else %}<p style="padding:20px;text-align:center;color:#888;">Koi member nahi.</p>{% endif %}
