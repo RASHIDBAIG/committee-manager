@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, session
+from flask import Flask, render_template, request, redirect, url_for, flash, session, send_from_directory
 import sqlite3, os, uuid
 from datetime import datetime
 from functools import wraps
@@ -6,8 +6,11 @@ from functools import wraps
 app = Flask(__name__)
 app.secret_key = 'committee-secret-2026-change-me'
 DB_PATH = os.path.join(os.path.dirname(__file__), 'committee.db')
-UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), 'static', 'uploads')
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+# Nayi secure folder (static ke bahar)
+SECURE_UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), 'secure_uploads')
+if not os.path.exists(SECURE_UPLOAD_FOLDER): os.makedirs(SECURE_UPLOAD_FOLDER)
+
 ADMIN_PASSWORD = "admin123"
 
 def get_db():
@@ -50,6 +53,12 @@ def logout():
     session.pop('admin', None)
     return redirect(url_for('login'))
 
+@app.route('/admin/view_image/<filename>')
+@login_required
+def view_image(filename):
+    # Yeh route sirf admin ko tasveer dekhne dega
+    return send_from_directory(SECURE_UPLOAD_FOLDER, filename)
+
 @app.route('/')
 @login_required
 def index():
@@ -83,9 +92,19 @@ def approve_member(mid):
 @login_required
 def reject_member(mid):
     conn = get_db()
-    conn.execute("DELETE FROM members WHERE id=?", (mid,))
-    conn.commit(); conn.close()
-    flash('Request delete kar di gayi.', 'success')
+    member = conn.execute("SELECT * FROM members WHERE id=?", (mid,)).fetchone()
+    if member:
+        # Tasveerein delete karein server se (Privacy)
+        for img in [member['cnic_front'], member['cnic_back'], member['selfie']]:
+            if img:
+                filepath = os.path.join(SECURE_UPLOAD_FOLDER, img)
+                if os.path.exists(filepath):
+                    os.remove(filepath)
+        
+        conn.execute("DELETE FROM members WHERE id=?", (mid,))
+        conn.commit()
+        flash('Request aur uski tasveerein permanently delete kar di gayi hain.', 'success')
+    conn.close()
     return redirect(url_for('members'))
 
 @app.route('/register', methods=['GET', 'POST'])
@@ -102,17 +121,17 @@ def register():
             if cnic_front and cnic_front.filename != '':
                 ext = os.path.splitext(cnic_front.filename)[1]
                 front_name = f"cnic_front_{uuid.uuid4().hex}{ext}"
-                cnic_front.save(os.path.join(app.config['UPLOAD_FOLDER'], front_name))
+                cnic_front.save(os.path.join(SECURE_UPLOAD_FOLDER, front_name))
 
             if cnic_back and cnic_back.filename != '':
                 ext = os.path.splitext(cnic_back.filename)[1]
                 back_name = f"cnic_back_{uuid.uuid4().hex}{ext}"
-                cnic_back.save(os.path.join(app.config['UPLOAD_FOLDER'], back_name))
+                cnic_back.save(os.path.join(SECURE_UPLOAD_FOLDER, back_name))
             
             if selfie and selfie.filename != '':
                 ext = os.path.splitext(selfie.filename)[1]
                 selfie_name = f"selfie_{uuid.uuid4().hex}{ext}"
-                selfie.save(os.path.join(app.config['UPLOAD_FOLDER'], selfie_name))
+                selfie.save(os.path.join(SECURE_UPLOAD_FOLDER, selfie_name))
 
             conn.execute("INSERT INTO members (name, phone, cnic, address, preferred_amount, status, created_at, cnic_front, cnic_back, selfie, profession, monthly_income, referred_by) VALUES (?,?,?,?,?,'pending',?,?,?,?,?,?,?)", 
                 (d['name'], d['phone'], d['cnic'], d['address'], d['preferred_amount'], datetime.now().isoformat(), front_name, back_name, selfie_name, d.get('profession'), d.get('monthly_income'), d.get('referred_by')))
