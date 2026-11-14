@@ -2,15 +2,13 @@ from flask import Flask, render_template, request, redirect, url_for, flash, ses
 import sqlite3, os, uuid
 from datetime import datetime
 from functools import wraps
+from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
 app.secret_key = 'committee-secret-2026-change-me'
 DB_PATH = os.path.join(os.path.dirname(__file__), 'committee.db')
-
-# Nayi secure folder (static ke bahar)
 SECURE_UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), 'secure_uploads')
 if not os.path.exists(SECURE_UPLOAD_FOLDER): os.makedirs(SECURE_UPLOAD_FOLDER)
-
 ADMIN_PASSWORD = "admin123"
 
 def get_db():
@@ -21,13 +19,13 @@ def get_db():
 def init_db():
     conn = get_db()
     conn.executescript("""
-        CREATE TABLE IF NOT EXISTS members (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, phone TEXT UNIQUE, cnic TEXT, address TEXT, address_type TEXT, guarantor_name TEXT, guarantor_phone TEXT, verified INTEGER DEFAULT 0, trust_score INTEGER DEFAULT 50, status TEXT DEFAULT 'approved', preferred_amount INTEGER, created_at TEXT, cnic_front TEXT, cnic_back TEXT, selfie TEXT, profession TEXT, monthly_income TEXT, referred_by TEXT);
+        CREATE TABLE IF NOT EXISTS members (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, phone TEXT UNIQUE, password TEXT, cnic TEXT, address TEXT, address_type TEXT, guarantor_name TEXT, guarantor_phone TEXT, verified INTEGER DEFAULT 0, trust_score INTEGER DEFAULT 50, status TEXT DEFAULT 'approved', preferred_amount INTEGER, created_at TEXT, cnic_front TEXT, cnic_back TEXT, selfie TEXT, profession TEXT, monthly_income TEXT, referred_by TEXT);
         CREATE TABLE IF NOT EXISTS committees (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, monthly_amount INTEGER, total_months INTEGER, start_date TEXT, status TEXT DEFAULT 'active', created_at TEXT);
         CREATE TABLE IF NOT EXISTS committee_members (id INTEGER PRIMARY KEY AUTOINCREMENT, committee_id INTEGER, member_id INTEGER, payout_month INTEGER);
         CREATE TABLE IF NOT EXISTS payments (id INTEGER PRIMARY KEY AUTOINCREMENT, committee_id INTEGER, member_id INTEGER, month_number INTEGER, amount INTEGER, status TEXT DEFAULT 'pending', transaction_id TEXT, paid_at TEXT);
         CREATE TABLE IF NOT EXISTS messages (id INTEGER PRIMARY KEY AUTOINCREMENT, member_id INTEGER, message TEXT, created_at TEXT, is_read INTEGER DEFAULT 0);
     """)
-    for col, dtype in [("status", "TEXT DEFAULT 'approved'"), ("preferred_amount", "INTEGER"), ("cnic_front", "TEXT"), ("cnic_back", "TEXT"), ("selfie", "TEXT"), ("profession", "TEXT"), ("monthly_income", "TEXT"), ("referred_by", "TEXT")]:
+    for col, dtype in [("status", "TEXT DEFAULT 'approved'"), ("preferred_amount", "INTEGER"), ("cnic_front", "TEXT"), ("cnic_back", "TEXT"), ("selfie", "TEXT"), ("profession", "TEXT"), ("monthly_income", "TEXT"), ("referred_by", "TEXT"), ("password", "TEXT")]:
         try: conn.execute(f"ALTER TABLE members ADD COLUMN {col} {dtype}")
         except sqlite3.OperationalError: pass
     conn.commit(); conn.close()
@@ -56,7 +54,6 @@ def logout():
 @app.route('/admin/view_image/<filename>')
 @login_required
 def view_image(filename):
-    # Yeh route sirf admin ko tasveer dekhne dega
     return send_from_directory(SECURE_UPLOAD_FOLDER, filename)
 
 @app.route('/')
@@ -94,13 +91,10 @@ def reject_member(mid):
     conn = get_db()
     member = conn.execute("SELECT * FROM members WHERE id=?", (mid,)).fetchone()
     if member:
-        # Tasveerein delete karein server se (Privacy)
         for img in [member['cnic_front'], member['cnic_back'], member['selfie']]:
             if img:
                 filepath = os.path.join(SECURE_UPLOAD_FOLDER, img)
-                if os.path.exists(filepath):
-                    os.remove(filepath)
-        
+                if os.path.exists(filepath): os.remove(filepath)
         conn.execute("DELETE FROM members WHERE id=?", (mid,))
         conn.commit()
         flash('Request aur uski tasveerein permanently delete kar di gayi hain.', 'success')
@@ -133,8 +127,10 @@ def register():
                 selfie_name = f"selfie_{uuid.uuid4().hex}{ext}"
                 selfie.save(os.path.join(SECURE_UPLOAD_FOLDER, selfie_name))
 
-            conn.execute("INSERT INTO members (name, phone, cnic, address, preferred_amount, status, created_at, cnic_front, cnic_back, selfie, profession, monthly_income, referred_by) VALUES (?,?,?,?,?,'pending',?,?,?,?,?,?,?)", 
-                (d['name'], d['phone'], d['cnic'], d['address'], d['preferred_amount'], datetime.now().isoformat(), front_name, back_name, selfie_name, d.get('profession'), d.get('monthly_income'), d.get('referred_by')))
+            hashed_pw = generate_password_hash(d['password'])
+            
+            conn.execute("INSERT INTO members (name, phone, password, cnic, address, preferred_amount, status, created_at, cnic_front, cnic_back, selfie, profession, monthly_income, referred_by) VALUES (?,?,?,?,?,?,'pending',?,?,?,?,?,?,?)", 
+                (d['name'], d['phone'], hashed_pw, d['cnic'], d['address'], d['preferred_amount'], datetime.now().isoformat(), front_name, back_name, selfie_name, d.get('profession'), d.get('monthly_income'), d.get('referred_by')))
             conn.commit()
             flash('Aap ki request bhej di gayi hai! Admin verify karne ke baad aap login kar sakenge.', 'success')
             return redirect(url_for('member_login'))
@@ -150,7 +146,8 @@ def add_member():
         d = request.form
         conn = get_db()
         try:
-            conn.execute("INSERT INTO members (name, phone, cnic, address, address_type, guarantor_name, guarantor_phone, verified, status, created_at) VALUES (?,?,?,?,?,?,?,?,'approved',?)", (d['name'], d['phone'], d['cnic'], d['address'], d['address_type'], d['guarantor_name'], d['guarantor_phone'], int(d.get('verified', 0)), datetime.now().isoformat()))
+            hashed_pw = generate_password_hash(d['password'])
+            conn.execute("INSERT INTO members (name, phone, password, cnic, address, address_type, guarantor_name, guarantor_phone, verified, status, created_at) VALUES (?,?,?,?,?,?,?,?,?,'approved',?)", (d['name'], d['phone'], hashed_pw, d['cnic'], d['address'], d['address_type'], d['guarantor_name'], d['guarantor_phone'], int(d.get('verified', 0)), datetime.now().isoformat()))
             conn.commit(); flash('Member add ho gaya!', 'success')
         except sqlite3.IntegrityError: flash('Yeh phone number pehle se maujood hai.', 'error')
         conn.close()
@@ -248,6 +245,7 @@ def delete_committee(cid):
 def member_login():
     if request.method == 'POST':
         phone = request.form['phone']
+        password = request.form['password']
         conn = get_db()
         member = conn.execute('SELECT * FROM members WHERE phone = ?', (phone,)).fetchone()
         conn.close()
@@ -255,10 +253,19 @@ def member_login():
             if member['status'] == 'pending':
                 flash('Aap ki request abhi pending hai. Admin approve karega phir aap login kar sakenge.', 'error')
                 return render_template('member_login.html')
-            session['member_id'] = member['id']
-            session['member_name'] = member['name']
-            return redirect(url_for('member_dashboard'))
-        flash('Phone number record mein nahi hai. Naya account banayein.', 'error')
+            
+            stored_pw = member['password']
+            if not stored_pw:
+                stored_pw = generate_password_hash(member['phone'])
+                
+            if check_password_hash(stored_pw, password):
+                session['member_id'] = member['id']
+                session['member_name'] = member['name']
+                return redirect(url_for('member_dashboard'))
+            else:
+                flash('Ghalat Password! Dobara koshish karein.', 'error')
+        else:
+            flash('Phone number record mein nahi hai.', 'error')
     return render_template('member_login.html')
 
 @app.route('/member_logout')
