@@ -1,0 +1,22 @@
+{% extends 'base.html' %}
+{% block content %}
+<div style="display:flex;justify-content:space-between;align-items:center;">
+<h2>Committees ({{ committees|length }})</h2>
+<a href="{{ url_for('create_committee') }}" class="btn btn-primary">+ Nayi Committee</a>
+</div>
+<div class="card">
+{% if committees %}
+<table><thead><tr><th>Naam</th><th>Monthly</th><th>Months</th><th>Start</th><th>Status</th><th>Actions</th></tr></thead>
+<tbody>{% for c in committees %}
+<tr>
+<td><a href="{{ url_for('committee_detail', cid=c.id) }}"><strong>{{ c.name }}</strong></a></td>
+<td>Rs. {{ c.monthly_amount }}</td><td>{{ c.total_months }}</td>
+<td>{{ c.start_date }}</td><td>{{ c.status }}</td>
+<td>
+<a href="{{ url_for('committee_detail', cid=c.id) }}" class="btn btn-primary" style="padding:5px 10px;font-size:12px;">View</a>
+<a href="{{ url_for('delete_committee', cid=c.id) }}" class="btn btn-danger" style="padding:5px 10px;font-size:12px;" onclick="return confirm('Pakka delete?')">Delete</a>
+</td></tr>{% endfor %}
+</tbody></table>
+{% else %}<p style="padding:20px;text-align:center;color:#888;">Koi committee nahi.</p>{% endif %}
+</div>
+{% endblock %}

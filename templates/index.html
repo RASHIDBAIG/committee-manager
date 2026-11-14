@@ -1,0 +1,16 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2>Dashboard</h2>
+<div class="grid">
+<div class="stat"><h3>{{ members }}</h3><p>Total Members</p></div>
+<div class="stat"><h3>{{ committees }}</h3><p>Active Committees</p></div>
+<div class="stat"><h3>{{ pending }}</h3><p>Pending Payments</p></div>
+</div>
+<div class="card">
+<h3>Quick Actions</h3>
+<div style="margin-top:15px;">
+<a href="{{ url_for('add_member') }}" class="btn btn-primary">+ Naya Member</a>
+<a href="{{ url_for('create_committee') }}" class="btn btn-success">+ Nayi Committee</a>
+<a href="{{ url_for('committees') }}" class="btn btn-secondary">Sab Committees</a>
+</div></div>
+{% endblock %}

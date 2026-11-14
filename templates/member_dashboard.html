@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="ur">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mera Hisab</title><link rel="manifest" href="/static/manifest.json"><meta name="theme-color" content="#28a745">
+<style>
+body{font-family:'Segoe UI',sans-serif;background:#f5f7fb;margin:0}
+.nav{background:#28a745;color:#fff;padding:15px 20px;display:flex;justify-content:space-between;align-items:center;}
+.container{max-width:800px;margin:20px auto;padding:0 15px}
+.card{background:#fff;padding:20px;border-radius:8px;margin-bottom:15px;box-shadow:0 1px 3px rgba(0,0,0,0.1)}
+h3{color:#333;margin-top:0}table{width:100%;border-collapse:collapse;margin-top:10px}
+th,td{padding:10px;border-bottom:1px solid #eee;text-align:left;font-size:14px;}
+th{background:#f8f9fa}.badge{padding:4px 8px;border-radius:4px;font-size:12px;color:#fff}
+.bg-green{background:#28a745}.bg-red{background:#dc3545}
+</style></head><body>
+<div class="nav"><strong>Assalam-o-Alaikum, {{ name }}</strong><a href="/member_logout" style="color:#fff;text-decoration:none;font-size:14px;">Logout</a></div>
+<div class="container">
+    <div class="card"><h3>Meri Committees</h3>
+        {% if committees %}{% for c in committees %}
+            <div style="border:1px solid #ddd; padding:15px; margin-bottom:10px; border-radius:5px; background:#fafafa;">
+                <strong style="font-size:16px;color:#1a5490;">{{ c.name }}</strong><br>
+                <span style="font-size:14px;color:#666;">Qist: Rs. {{ c.monthly_amount }} | Total Mahine: {{ c.total_months }}</span><br>
+                <span style="font-size:15px;color:#28a745;font-weight:bold;margin-top:8px;display:block;">Meri Bari: Mahina #{{ c.payout_month }}</span>
+            </div>
+        {% endfor %}{% else %}<p>Aap abhi kisi committee mein shamil nahi hain.</p>{% endif %}
+    </div>
+    <div class="card"><h3>Mere Payments Ka Hisab</h3>
+        {% if payments %}
+        <table><thead><tr><th>Committee</th><th>Mahina</th><th>Raqam</th><th>Status</th></tr></thead><tbody>
+            {% for p in payments %}
+                <tr><td>{{ p.committee_name }}</td><td>#{{ p.month_number }}</td><td>Rs. {{ p.amount }}</td>
+                    <td>{% if p.status == 'paid' %}<span class="badge bg-green">Ada Kiya</span>{% else %}<span class="badge bg-red">Baqi Hai</span>{% endif %}</td></tr>
+            {% endfor %}
+        </tbody></table>
+        {% else %}<p>Abhi koi payment record nahi hai.</p>{% endif %}
+    </div>
+</div></body></html>

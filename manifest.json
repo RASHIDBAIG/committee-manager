@@ -1,0 +1,15 @@
+{
+  "name": "Committee Manager",
+  "short_name": "Committee",
+  "start_url": "/member_login",
+  "display": "standalone",
+  "background_color": "#f5f7fb",
+  "theme_color": "#28a745",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/3135/3135706.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

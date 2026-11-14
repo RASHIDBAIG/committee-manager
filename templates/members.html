@@ -1,0 +1,21 @@
+{% extends 'base.html' %}
+{% block content %}
+<div style="display:flex;justify-content:space-between;align-items:center;">
+<h2>Members ({{ members|length }})</h2>
+<a href="{{ url_for('add_member') }}" class="btn btn-primary">+ Naya Member</a>
+</div>
+<div class="card">
+{% if members %}
+<table><thead><tr><th>Naam</th><th>Phone</th><th>Address</th><th>Guarantor</th><th>Trust</th><th>Status</th><th>Action</th></tr></thead>
+<tbody>{% for m in members %}
+<tr>
+<td>{{ m.name }}</td><td>{{ m.phone }}</td>
+<td>{{ m.address or '-' }}</td><td>{{ m.guarantor_name or '-' }}</td>
+<td>{{ m.trust_score }}/100</td>
+<td>{% if m.verified %}<span class="badge badge-verified">Verified</span>{% else %}<span class="badge badge-pending">Pending</span>{% endif %}</td>
+<td>{% if not m.verified %}<a href="{{ url_for('verify_member', mid=m.id) }}" class="btn btn-success" style="padding:5px 10px;font-size:12px;">Verify</a>{% endif %}</td>
+</tr>{% endfor %}
+</tbody></table>
+{% else %}<p style="padding:20px;text-align:center;color:#888;">Koi member nahi. Pehla member add karein.</p>{% endif %}
+</div>
+{% endblock %}
