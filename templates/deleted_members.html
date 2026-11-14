@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% block content %}
 <div style="display:flex;justify-content:space-between;align-items:center;">
-<h2>🗑️ Deleted / Rejected Members</h2>
+<h2>&#128465; Deleted / Rejected Members</h2>
 <a href="{{ url_for('members') }}" class="btn btn-primary">Wapas Members Par Jayein</a>
 </div>
 
@@ -21,8 +21,8 @@
     {% endif %}
 </td>
 <td>
-    <a href="{{ url_for('restore_member', mid=m.id) }}" class="btn btn-success" style="padding:5px 10px;font-size:12px;margin-bottom:2px;">♻️ Restore</a>
-    <a href="{{ url_for('hard_delete_member', mid=m.id) }}" class="btn btn-danger" style="padding:5px 10px;font-size:12px;" onclick="return confirm('Hamesha ke liye delete karein?')">❌ Permanently Delete</a>
+    <a href="{{ url_for('restore_member', mid=m.id) }}" class="btn btn-success" style="padding:5px 10px;font-size:12px;margin-bottom:2px;">&#9851; Restore</a>
+    <a href="{{ url_for('hard_delete_member', mid=m.id) }}" class="btn btn-danger" style="padding:5px 10px;font-size:12px;" onclick="return confirm('Hamesha ke liye delete karein?')">&#10060; Permanently Delete</a>
 </td>
 </tr>{% endfor %}
 </tbody></table>

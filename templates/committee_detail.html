@@ -4,8 +4,8 @@
 <h2>{{ committee.name }}</h2>
 <p style="color:#666;">Rs. {{ committee.monthly_amount }} x {{ committee.total_months }} mahine | Commission: {{ committee.commission_pct }}%</p>
 <div style="margin-top:15px;">
-    <a href="{{ url_for('draw_bari', cid=committee.id) }}" class="btn btn-primary" onclick="return confirm('Bariyan randomly assign ho jayengi. Pakka?')">🎲 Auto Draw Bari</a>
-    <a href="{{ url_for('export_csv', cid=committee.id) }}" class="btn btn-success">📥 Download Excel</a>
+    <a href="{{ url_for('draw_bari', cid=committee.id) }}" class="btn btn-primary" onclick="return confirm('Bariyan randomly assign ho jayengi. Pakka?')">&#127922; Auto Draw Bari</a>
+    <a href="{{ url_for('export_csv', cid=committee.id) }}" class="btn btn-success">&#128229; Download Excel</a>
 </div>
 </div>
 <div class="row">
