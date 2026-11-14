@@ -1,21 +1,28 @@
 {% extends 'base.html' %}
 {% block content %}
 <div style="display:flex;justify-content:space-between;align-items:center;">
-<h2>🗑️ Deleted Members</h2>
+<h2>🗑️ Deleted / Rejected Members</h2>
 <a href="{{ url_for('members') }}" class="btn btn-primary">Wapas Members Par Jayein</a>
 </div>
 
 <div class="card" style="margin-top:20px;">
 {% if deleted_members %}
-<table><thead><tr><th>Naam</th><th>Phone</th><th>Password</th><th>Actions</th></tr></thead>
+<table><thead><tr><th>Naam</th><th>Phone</th><th>Status / Wajah</th><th>Actions</th></tr></thead>
 <tbody>{% for m in deleted_members %}
 <tr>
 <td>{{ m.name }}</td>
 <td>{{ m.phone }}</td>
-<td>{{ m.plain_password or m.phone }}</td>
+<td>
+    {% if m.status == 'rejected' %}
+        <span style="color:red; font-weight:bold;">Rejected</span><br>
+        <small>{{ m.rejection_reason }}</small>
+    {% else %}
+        <span style="color:gray;">Deleted</span>
+    {% endif %}
+</td>
 <td>
     <a href="{{ url_for('restore_member', mid=m.id) }}" class="btn btn-success" style="padding:5px 10px;font-size:12px;margin-bottom:2px;">♻️ Restore</a>
-    <a href="{{ url_for('hard_delete_member', mid=m.id) }}" class="btn btn-danger" style="padding:5px 10px;font-size:12px;" onclick="return confirm('Hamesha ke liye delete karein? Tasveerein bhi ud jayengi.')">❌ Permanently Delete</a>
+    <a href="{{ url_for('hard_delete_member', mid=m.id) }}" class="btn btn-danger" style="padding:5px 10px;font-size:12px;" onclick="return confirm('Hamesha ke liye delete karein?')">❌ Permanently Delete</a>
 </td>
 </tr>{% endfor %}
 </tbody></table>

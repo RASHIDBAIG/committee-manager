@@ -21,13 +21,13 @@ def get_db():
 def init_db():
     conn = get_db()
     conn.executescript("""
-        CREATE TABLE IF NOT EXISTS members (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, phone TEXT UNIQUE, password TEXT, plain_password TEXT, cnic TEXT, address TEXT, address_type TEXT, guarantor_name TEXT, guarantor_phone TEXT, verified INTEGER DEFAULT 0, trust_score INTEGER DEFAULT 50, status TEXT DEFAULT 'approved', preferred_amount INTEGER, created_at TEXT, cnic_front TEXT, cnic_back TEXT, selfie TEXT, profession TEXT, monthly_income TEXT, referred_by TEXT);
+        CREATE TABLE IF NOT EXISTS members (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, phone TEXT UNIQUE, password TEXT, plain_password TEXT, cnic TEXT, address TEXT, address_type TEXT, guarantor_name TEXT, guarantor_phone TEXT, verified INTEGER DEFAULT 0, trust_score INTEGER DEFAULT 50, status TEXT DEFAULT 'approved', preferred_amount INTEGER, created_at TEXT, cnic_front TEXT, cnic_back TEXT, selfie TEXT, profession TEXT, monthly_income TEXT, referred_by TEXT, rejection_reason TEXT);
         CREATE TABLE IF NOT EXISTS committees (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, monthly_amount INTEGER, total_months INTEGER, start_date TEXT, status TEXT DEFAULT 'active', created_at TEXT);
         CREATE TABLE IF NOT EXISTS committee_members (id INTEGER PRIMARY KEY AUTOINCREMENT, committee_id INTEGER, member_id INTEGER, payout_month INTEGER);
         CREATE TABLE IF NOT EXISTS payments (id INTEGER PRIMARY KEY AUTOINCREMENT, committee_id INTEGER, member_id INTEGER, month_number INTEGER, amount INTEGER, status TEXT DEFAULT 'pending', transaction_id TEXT, paid_at TEXT);
         CREATE TABLE IF NOT EXISTS messages (id INTEGER PRIMARY KEY AUTOINCREMENT, member_id INTEGER, message TEXT, created_at TEXT, is_read INTEGER DEFAULT 0);
     """)
-    for col, dtype in [("status", "TEXT DEFAULT 'approved'"), ("preferred_amount", "INTEGER"), ("cnic_front", "TEXT"), ("cnic_back", "TEXT"), ("selfie", "TEXT"), ("profession", "TEXT"), ("monthly_income", "TEXT"), ("referred_by", "TEXT"), ("password", "TEXT"), ("plain_password", "TEXT")]:
+    for col, dtype in [("status", "TEXT DEFAULT 'approved'"), ("preferred_amount", "INTEGER"), ("cnic_front", "TEXT"), ("cnic_back", "TEXT"), ("selfie", "TEXT"), ("profession", "TEXT"), ("monthly_income", "TEXT"), ("referred_by", "TEXT"), ("password", "TEXT"), ("plain_password", "TEXT"), ("rejection_reason", "TEXT")]:
         try: conn.execute(f"ALTER TABLE members ADD COLUMN {col} {dtype}")
         except sqlite3.OperationalError: pass
     conn.commit(); conn.close()
@@ -84,7 +84,7 @@ def members():
 @login_required
 def deleted_members():
     conn = get_db()
-    deleted = conn.execute("SELECT * FROM members WHERE status='deleted' ORDER BY id DESC").fetchall()
+    deleted = conn.execute("SELECT * FROM members WHERE status='deleted' OR status='rejected' ORDER BY id DESC").fetchall()
     conn.close()
     return render_template('deleted_members.html', deleted_members=deleted)
 
@@ -101,7 +101,7 @@ def delete_member_soft(mid):
 @login_required
 def restore_member(mid):
     conn = get_db()
-    conn.execute("UPDATE members SET status='approved' WHERE id=?", (mid,))
+    conn.execute("UPDATE members SET status='approved', rejection_reason=NULL WHERE id=?", (mid,))
     conn.commit(); conn.close()
     flash('Member wapas restore ho gaya!', 'success')
     return redirect(url_for('deleted_members'))
@@ -126,15 +126,20 @@ def hard_delete_member(mid):
 @login_required
 def approve_member(mid):
     conn = get_db()
-    conn.execute("UPDATE members SET status='approved' WHERE id=?", (mid,))
+    conn.execute("UPDATE members SET status='approved', rejection_reason=NULL WHERE id=?", (mid,))
     conn.commit(); conn.close()
     flash('Member kamyabi se approve ho gaya!', 'success')
     return redirect(url_for('members'))
 
-@app.route('/members/reject/<int:mid>')
+@app.route('/members/reject/<int:mid>', methods=['POST'])
 @login_required
 def reject_member(mid):
-    return hard_delete_member(mid)
+    reason = request.form.get('reason', 'Aap ki details sahi nahi thin.')
+    conn = get_db()
+    conn.execute("UPDATE members SET status='rejected', rejection_reason=? WHERE id=?", (reason, mid))
+    conn.commit(); conn.close()
+    flash('Member reject kar diya gaya hai. Wajah usay login par nazar aayegi.', 'success')
+    return redirect(url_for('members'))
 
 @app.route('/members/reset_password/<int:mid>', methods=['POST'])
 @login_required
@@ -297,10 +302,14 @@ def member_login():
         conn.close()
         if member:
             if member['status'] == 'pending':
-                flash('Aap ki request abhi pending hai. Admin approve karega phir aap login kar sakenge.', 'error')
+                flash('Aap ki request abhi pending hai. Admin verify karega phir aap login kar sakenge.', 'error')
                 return render_template('member_login.html')
             if member['status'] == 'deleted':
                 flash('Aap ka account delete kar diya gaya hai. Admin se rabta karein.', 'error')
+                return render_template('member_login.html')
+            if member['status'] == 'rejected':
+                reason = member['rejection_reason'] or 'Aap ki details verify nahi ho sakin.'
+                flash(f'Aap ki request REJECT kar di gayi hai. Wajah: {reason}', 'error')
                 return render_template('member_login.html')
             
             stored_pw = member['password']

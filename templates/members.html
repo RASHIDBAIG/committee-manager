@@ -3,7 +3,7 @@
 <div style="display:flex;justify-content:space-between;align-items:center;">
 <h2>Members ({{ members|length }})</h2>
 <div>
-    <a href="{{ url_for('deleted_members') }}" class="btn btn-secondary" style="margin-right:10px;">🗑️ Deleted List</a>
+    <a href="{{ url_for('deleted_members') }}" class="btn btn-secondary" style="margin-right:10px;">🗑️ Deleted / Rejected List</a>
     <a href="{{ url_for('add_member') }}" class="btn btn-primary">+ Naya Member</a>
 </div>
 </div>
@@ -25,9 +25,13 @@
             {% if m.cnic_front %}<a href="{{ url_for('view_image', filename=m.cnic_front) }}" target="_blank" class="btn btn-secondary" style="padding:3px 8px;font-size:11px;margin-bottom:2px;">CNIC Front</a>{% endif %}
             {% if m.cnic_back %}<a href="{{ url_for('view_image', filename=m.cnic_back) }}" target="_blank" class="btn btn-secondary" style="padding:3px 8px;font-size:11px;margin-bottom:2px;">CNIC Back</a>{% endif %}
         </td>
-        <td>
-            <a href="{{ url_for('approve_member', mid=m.id) }}" class="btn btn-success" style="padding:5px 10px;font-size:12px;margin-bottom:2px;">Approve</a><br>
-            <a href="{{ url_for('reject_member', mid=m.id) }}" class="btn btn-danger" style="padding:5px 10px;font-size:12px;" onclick="return confirm('Reject?')">Reject</a>
+        <td style="min-width:150px;">
+            <a href="{{ url_for('approve_member', mid=m.id) }}" class="btn btn-success" style="padding:5px 10px;font-size:12px;margin-bottom:5px;display:block;">Approve</a>
+            
+            <form method="POST" action="{{ url_for('reject_member', mid=m.id) }}">
+                <input type="text" name="reason" placeholder="Wajah e reject likhein..." required style="width:100%; padding:4px; font-size:11px; margin-bottom:2px; border:1px solid #ccc; border-radius:3px;">
+                <button type="submit" class="btn btn-danger" style="padding:5px 10px;font-size:12px; width:100%;" onclick="return confirm('Reject kar dein?')">Reject</button>
+            </form>
         </td>
     </tr>{% endfor %}
     </tbody></table>
