@@ -1,0 +1,11 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2>🔍 Audit Log (Har Action Ka Record)</h2>
+<div class="card">
+<table><thead><tr><th>Time</th><th>Action</th><th>Target</th><th>Details</th><th>IP</th></tr></thead><tbody>
+{% for l in logs %}
+<tr><td style="font-size:11px;">{{ l.created_at[:16] }}</td><td><strong>{{ l.action }}</strong></td><td>{{ l.target_type }} #{{ l.target_id }}</td><td style="font-size:12px;">{{ l.details }}</td><td style="font-size:11px;">{{ l.ip }}</td></tr>
+{% endfor %}
+</tbody></table>
+</div>
+{% endblock %}

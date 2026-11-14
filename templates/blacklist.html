@@ -1,0 +1,14 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2>🚫 Blacklist (Fraud Log)</h2>
+<div class="card">
+{% if blacklist %}
+<table><thead><tr><th>Phone</th><th>CNIC</th><th>Wajah</th><th>Date</th><th>Action</th></tr></thead><tbody>
+{% for b in blacklist %}
+<tr><td>{{ b.phone }}</td><td>{{ b.cnic }}</td><td>{{ b.reason }}</td><td>{{ b.created_at[:16] }}</td>
+<td><form method="POST" action="{{ url_for('blacklist_remove', bid=b.id) }}" style="display:flex;"><input type="text" name="reason" placeholder="Wajah" required style="width:120px;font-size:11px;"><button type="submit" class="btn btn-secondary" style="font-size:11px;">Remove</button></form></td></tr>
+{% endfor %}
+</tbody></table>
+{% else %}<p style="padding:20px;text-align:center;color:#888;">Koi blacklist entry nahi. Sab clean hai!</p>{% endif %}
+</div>
+{% endblock %}

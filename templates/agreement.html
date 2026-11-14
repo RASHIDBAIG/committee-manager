@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2>📜 Guarantor & Legal Agreement</h2>
+<div class="card">
+<h3>Member: {{ member.name }}</h3>
+<p>Phone: {{ member.phone }} | CNIC: {{ member.cnic }}</p>
+<p>Guarantor: {{ member.guarantor_name }} ({{ member.guarantor_phone }}) - CNIC: {{ member.guarantor_cnic or 'N/A' }}</p>
+<hr>
+{% if agreement %}
+<div style="background:#d4edda;padding:15px;border-radius:6px;">
+<strong>✅ SIGNED</strong><br>
+Naam: {{ agreement.signed_name }}<br>
+Tareekh: {{ agreement.signed_at }}<br>
+IP: {{ agreement.ip }}
+</div>
+{% else %}
+<p><strong>Agreement Text:</strong></p>
+<div style="background:#f8f9fa;padding:15px;border-left:4px solid #1a5490;font-size:14px;">
+Main <strong>{{ member.name }}</strong> (CNIC: {{ member.cnic }}) iqrar karta hoon ke main committee ki tamam qistain waqt par jama karunga. Agar main default karunga to mere Guarantor <strong>{{ member.guarantor_name }}</strong> (CNIC: {{ member.guarantor_cnic or 'N/A' }}) zimmedar honge. Mere khilaf qanooni karwai ki ja sakti hai.
+</div>
+<form method="POST" action="{{ url_for('sign_agreement', mid=member.id) }}" style="margin-top:15px;">
+<label>Apna Naam Likhein (Signature) *</label>
+<input type="text" name="signed_name" required placeholder="Yahan apna poora naam likhein">
+<button type="submit" class="btn btn-primary" style="margin-top:10px;">✍️ Agreement Sign Karein</button>
+</form>
+{% endif %}
+</div>
+{% endblock %}

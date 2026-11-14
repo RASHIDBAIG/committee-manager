@@ -21,21 +21,38 @@ def get_db():
 def init_db():
     conn = get_db()
     conn.executescript("""
-        CREATE TABLE IF NOT EXISTS members (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, phone TEXT UNIQUE, password TEXT, plain_password TEXT, cnic TEXT, address TEXT, address_type TEXT, guarantor_name TEXT, guarantor_phone TEXT, guarantor_cnic TEXT, verified INTEGER DEFAULT 0, trust_score INTEGER DEFAULT 50, status TEXT DEFAULT 'approved', preferred_amount INTEGER, created_at TEXT, cnic_front TEXT, cnic_back TEXT, selfie TEXT, profession TEXT, monthly_income TEXT, referred_by TEXT, rejection_reason TEXT, is_defaulter INTEGER DEFAULT 0);
+        CREATE TABLE IF NOT EXISTS members (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, phone TEXT UNIQUE, password TEXT, plain_password TEXT, cnic TEXT, address TEXT, address_type TEXT, guarantor_name TEXT, guarantor_phone TEXT, guarantor_cnic TEXT, verified INTEGER DEFAULT 0, trust_score INTEGER DEFAULT 50, status TEXT DEFAULT 'approved', preferred_amount INTEGER, created_at TEXT, cnic_front TEXT, cnic_back TEXT, selfie TEXT, profession TEXT, monthly_income TEXT, referred_by TEXT, rejection_reason TEXT, is_defaulter INTEGER DEFAULT 0, guarantor_member_id INTEGER, security_deposit INTEGER DEFAULT 0, is_blacklisted INTEGER DEFAULT 0);
         CREATE TABLE IF NOT EXISTS committees (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, monthly_amount INTEGER, total_months INTEGER, start_date TEXT, status TEXT DEFAULT 'active', commission_pct INTEGER DEFAULT 2, created_at TEXT);
-        CREATE TABLE IF NOT EXISTS committee_members (id INTEGER PRIMARY KEY AUTOINCREMENT, committee_id INTEGER, member_id INTEGER, payout_month INTEGER);
-        CREATE TABLE IF NOT EXISTS payments (id INTEGER PRIMARY KEY AUTOINCREMENT, committee_id INTEGER, member_id INTEGER, month_number INTEGER, amount INTEGER, status TEXT DEFAULT 'pending', transaction_id TEXT, screenshot TEXT, paid_at TEXT);
+        CREATE TABLE IF NOT EXISTS committee_members (id INTEGER PRIMARY KEY AUTOINCREMENT, committee_id INTEGER, member_id INTEGER, payout_month INTEGER, payout_released INTEGER DEFAULT 0, payout_locked INTEGER DEFAULT 0, lock_reason TEXT);
+        CREATE TABLE IF NOT EXISTS payments (id INTEGER PRIMARY KEY AUTOINCREMENT, committee_id INTEGER, member_id INTEGER, month_number INTEGER, amount INTEGER, status TEXT DEFAULT 'pending', transaction_id TEXT, screenshot TEXT, paid_at TEXT, verified_by TEXT, verified_at TEXT);
         CREATE TABLE IF NOT EXISTS messages (id INTEGER PRIMARY KEY AUTOINCREMENT, member_id INTEGER, message TEXT, created_at TEXT, is_read INTEGER DEFAULT 0);
+        CREATE TABLE IF NOT EXISTS audit_log (id INTEGER PRIMARY KEY AUTOINCREMENT, admin_id TEXT, action TEXT, target_type TEXT, target_id INTEGER, details TEXT, ip TEXT, created_at TEXT);
+        CREATE TABLE IF NOT EXISTS blacklist (id INTEGER PRIMARY KEY AUTOINCREMENT, phone TEXT, cnic TEXT, reason TEXT, added_by TEXT, created_at TEXT);
+        CREATE TABLE IF NOT EXISTS security_deposits (id INTEGER PRIMARY KEY AUTOINCREMENT, member_id INTEGER, committee_id INTEGER, amount INTEGER, status TEXT DEFAULT 'held', created_at TEXT);
+        CREATE TABLE IF NOT EXISTS agreements (id INTEGER PRIMARY KEY AUTOINCREMENT, member_id INTEGER, committee_id INTEGER, signed_name TEXT, signed_at TEXT, ip TEXT);
     """)
-    for col, dtype in [("status", "TEXT DEFAULT 'approved'"), ("preferred_amount", "INTEGER"), ("cnic_front", "TEXT"), ("cnic_back", "TEXT"), ("selfie", "TEXT"), ("profession", "TEXT"), ("monthly_income", "TEXT"), ("referred_by", "TEXT"), ("password", "TEXT"), ("plain_password", "TEXT"), ("rejection_reason", "TEXT"), ("is_defaulter", "INTEGER DEFAULT 0"), ("guarantor_cnic", "TEXT")]:
+    for col, dtype in [("status", "TEXT DEFAULT 'approved'"), ("preferred_amount", "INTEGER"), ("cnic_front", "TEXT"), ("cnic_back", "TEXT"), ("selfie", "TEXT"), ("profession", "TEXT"), ("monthly_income", "TEXT"), ("referred_by", "TEXT"), ("password", "TEXT"), ("plain_password", "TEXT"), ("rejection_reason", "TEXT"), ("is_defaulter", "INTEGER DEFAULT 0"), ("guarantor_cnic", "TEXT"), ("guarantor_member_id", "INTEGER"), ("security_deposit", "INTEGER DEFAULT 0"), ("is_blacklisted", "INTEGER DEFAULT 0")]:
         try: conn.execute(f"ALTER TABLE members ADD COLUMN {col} {dtype}")
         except sqlite3.OperationalError: pass
     try: conn.execute("ALTER TABLE committees ADD COLUMN commission_pct INTEGER DEFAULT 2")
     except sqlite3.OperationalError: pass
-    try: conn.execute("ALTER TABLE payments ADD COLUMN screenshot TEXT")
-    except sqlite3.OperationalError: pass
+    for col, dtype in [("screenshot", "TEXT"), ("verified_by", "TEXT"), ("verified_at", "TEXT")]:
+        try: conn.execute(f"ALTER TABLE payments ADD COLUMN {col} {dtype}")
+        except sqlite3.OperationalError: pass
+    for col, dtype in [("payout_released", "INTEGER DEFAULT 0"), ("payout_locked", "INTEGER DEFAULT 0"), ("lock_reason", "TEXT")]:
+        try: conn.execute(f"ALTER TABLE committee_members ADD COLUMN {col} {dtype}")
+        except sqlite3.OperationalError: pass
     conn.commit(); conn.close()
 
+
+def log_action(action, target_type, target_id, details):
+    try:
+        conn = get_db()
+        conn.execute("INSERT INTO audit_log (admin_id, action, target_type, target_id, details, ip, created_at) VALUES (?,?,?,?,?,?,?)",
+                     ('admin', action, target_type, target_id, details, request.remote_addr, datetime.now().isoformat()))
+        conn.commit(); conn.close()
+    except Exception as e:
+        print("Audit log error:", e)
 def login_required(f):
     @wraps(f)
     def deco(*a, **kw):
@@ -88,23 +105,55 @@ def members():
     conn.close()
     return render_template('members.html', members=approved_members, pending_members=pending_members)
 
-@app.route('/members/toggle_defaulter/<int:mid>')
+@app.route('/members/mark_defaulter/<int:mid>', methods=['POST'])
 @login_required
-def toggle_defaulter(mid):
+def mark_defaulter(mid):
+    reason = request.form.get('reason', 'Payment default')
     conn = get_db()
-    member = conn.execute("SELECT is_defaulter FROM members WHERE id=?", (mid,)).fetchone()
-    new_status = 0 if member['is_defaulter'] == 1 else 1
-    conn.execute("UPDATE members SET is_defaulter=? WHERE id=?", (new_status, mid))
+    member = conn.execute("SELECT * FROM members WHERE id=?", (mid,)).fetchone()
+    if not member:
+        flash('Member nahi mila.', 'error'); conn.close(); return redirect(url_for('members'))
+    conn.execute("UPDATE members SET is_defaulter=1, is_blacklisted=1, trust_score=0 WHERE id=?", (mid,))
+    conn.execute("INSERT INTO blacklist (phone, cnic, reason, added_by, created_at) VALUES (?,?,?,?,?)",
+                 (member['phone'], member['cnic'] or '', reason, 'admin', datetime.now().isoformat()))
+    committees = conn.execute("SELECT committee_id FROM committee_members WHERE member_id=?", (mid,)).fetchall()
+    for c in committees:
+        guarantors = conn.execute("SELECT cm.id FROM committee_members cm JOIN members m ON cm.member_id=m.id WHERE cm.committee_id=? AND m.guarantor_member_id=?", (c['committee_id'], mid)).fetchall()
+        for g in guarantors:
+            conn.execute("UPDATE committee_members SET payout_locked=1, lock_reason=? WHERE id=?", (f"Guarantor of defaulter: {member['name']}", g['id']))
     conn.commit(); conn.close()
-    flash('Member ka Defaulter status update ho gaya!', 'success')
+    log_action('MARK_DEFAULTER', 'member', mid, f"Reason: {reason}")
+    flash(f"{member['name']} DEFAULTER mark ho gaya. Guarantor payout LOCK ho gaya.", 'success')
+    return redirect(url_for('members'))
+
+@app.route('/members/unmark_defaulter/<int:mid>', methods=['POST'])
+@login_required
+def unmark_defaulter(mid):
+    reason = request.form.get('reason', 'Cleared after recovery')
+    conn = get_db()
+    member = conn.execute("SELECT * FROM members WHERE id=?", (mid,)).fetchone()
+    conn.execute("UPDATE members SET is_defaulter=0, is_blacklisted=0, trust_score=50 WHERE id=?", (mid,))
+    conn.execute("DELETE FROM blacklist WHERE phone=?", (member['phone'],))
+    committees = conn.execute("SELECT committee_id FROM committee_members WHERE member_id=?", (mid,)).fetchall()
+    for c in committees:
+        conn.execute("UPDATE committee_members SET payout_locked=0, lock_reason=NULL WHERE committee_id=?", (c['committee_id'],))
+    conn.commit(); conn.close()
+    log_action('UNMARK_DEFAULTER', 'member', mid, f"Reason: {reason}")
+    flash(f"{member['name']} ka defaulter status clear ho gaya.", 'success')
     return redirect(url_for('members'))
 
 @app.route('/members/approve/<int:mid>')
 @login_required
 def approve_member(mid):
     conn = get_db()
+    m = conn.execute("SELECT * FROM members WHERE id=?", (mid,)).fetchone()
+    bl = conn.execute("SELECT * FROM blacklist WHERE phone=? OR cnic=?", (m['phone'], m['cnic'] or '')).fetchone()
+    if bl:
+        flash('Yeh banda BLACKLIST mein hai. Approve nahi ho sakta.', 'error')
+        conn.close(); return redirect(url_for('members'))
     conn.execute("UPDATE members SET status='approved', rejection_reason=NULL WHERE id=?", (mid,))
     conn.commit(); conn.close()
+    log_action('APPROVE_MEMBER', 'member', mid, f"Name: {m['name']}")
     flash('Member approve ho gaya!', 'success')
     return redirect(url_for('members'))
 
@@ -307,6 +356,107 @@ def add_member():
 def verify_member(mid):
     conn = get_db(); conn.execute('UPDATE members SET verified=1, trust_score=trust_score+20 WHERE id=?', (mid,)); conn.commit(); conn.close()
     return redirect(url_for('members'))
+
+
+# ================= FRAUD PREVENTION ROUTES =================
+
+@app.route('/committees/<int:cid>/lock_payout/<int:cmid>', methods=['POST'])
+@login_required
+def lock_payout(cid, cmid):
+    reason = request.form.get('reason', 'Manual lock')
+    conn = get_db()
+    conn.execute("UPDATE committee_members SET payout_locked=1, lock_reason=? WHERE id=? AND committee_id=?", (reason, cmid, cid))
+    conn.commit(); conn.close()
+    log_action('LOCK_PAYOUT', 'committee_member', cmid, f"Committee {cid}, Reason: {reason}")
+    flash('Payout LOCK ho gaya. Ab release nahi hoga.', 'success')
+    return redirect(url_for('committee_detail', cid=cid))
+
+@app.route('/committees/<int:cid>/release_payout/<int:cmid>', methods=['POST'])
+@login_required
+def release_payout(cid, cmid):
+    conn = get_db()
+    cm = conn.execute("SELECT cm.*, m.name, m.security_deposit FROM committee_members cm JOIN members m ON cm.member_id=m.id WHERE cm.id=?", (cmid,)).fetchone()
+    if not cm:
+        flash('Member nahi mila.', 'error'); conn.close(); return redirect(url_for('committee_detail', cid=cid))
+    if cm['payout_locked']:
+        flash(f"Payout LOCK hai. Wajah: {cm['lock_reason'] or 'Guarantor default'}", 'error')
+        conn.close(); return redirect(url_for('committee_detail', cid=cid))
+    unpaid = conn.execute("SELECT COUNT(*) c FROM payments WHERE committee_id=? AND member_id=? AND month_number<? AND status!='paid'", (cid, cm['member_id'], cm['payout_month'])).fetchone()['c']
+    if unpaid > 0:
+        flash(f"{unpaid} payments abhi baqi hain. Payout release nahi ho sakta.", 'error')
+        conn.close(); return redirect(url_for('committee_detail', cid=cid))
+    conn.execute("UPDATE committee_members SET payout_released=1 WHERE id=?", (cmid,))
+    conn.commit(); conn.close()
+    log_action('RELEASE_PAYOUT', 'committee_member', cmid, f"Committee {cid}, Member: {cm['name']}")
+    flash(f"{cm['name']} ka payout release ho gaya.", 'success')
+    return redirect(url_for('committee_detail', cid=cid))
+
+@app.route('/security-deposit/<int:mid>', methods=['POST'])
+@login_required
+def add_security_deposit(mid):
+    amount = int(request.form.get('amount', 0))
+    cid = int(request.form.get('committee_id', 0))
+    conn = get_db()
+    conn.execute("INSERT INTO security_deposits (member_id, committee_id, amount, status, created_at) VALUES (?,?,?,'held',?)", (mid, cid, amount, datetime.now().isoformat()))
+    conn.execute("UPDATE members SET security_deposit=security_deposit+? WHERE id=?", (amount, mid))
+    conn.commit(); conn.close()
+    log_action('ADD_SECURITY_DEPOSIT', 'member', mid, f"Amount: {amount}, Committee: {cid}")
+    flash(f"Rs. {amount} security deposit record ho gayi.", 'success')
+    return redirect(url_for('members'))
+
+@app.route('/agreement/<int:mid>')
+@login_required
+def view_agreement(mid):
+    conn = get_db()
+    m = conn.execute("SELECT * FROM members WHERE id=?", (mid,)).fetchone()
+    ag = conn.execute("SELECT * FROM agreements WHERE member_id=? ORDER BY id DESC LIMIT 1", (mid,)).fetchone()
+    conn.close()
+    return render_template('agreement.html', member=m, agreement=ag)
+
+@app.route('/agreement/<int:mid>/sign', methods=['POST'])
+@login_required
+def sign_agreement(mid):
+    signed_name = request.form.get('signed_name', '').strip()
+    if not signed_name:
+        flash('Naam likhna zaroori hai.', 'error'); return redirect(url_for('view_agreement', mid=mid))
+    conn = get_db()
+    conn.execute("INSERT INTO agreements (member_id, committee_id, signed_name, signed_at, ip) VALUES (?,?,?,?,?)",
+                 (mid, 0, signed_name, datetime.now().isoformat(), request.remote_addr))
+    conn.commit(); conn.close()
+    log_action('SIGN_AGREEMENT', 'member', mid, f"Signed by: {signed_name}")
+    flash('Agreement sign ho gaya. Yeh legal record hai.', 'success')
+    return redirect(url_for('view_agreement', mid=mid))
+
+@app.route('/audit-log')
+@login_required
+def audit_log_view():
+    conn = get_db()
+    logs = conn.execute("SELECT * FROM audit_log ORDER BY id DESC LIMIT 300").fetchall()
+    conn.close()
+    return render_template('audit_log.html', logs=logs)
+
+@app.route('/blacklist')
+@login_required
+def blacklist_view():
+    conn = get_db()
+    bl = conn.execute("SELECT * FROM blacklist ORDER BY id DESC").fetchall()
+    conn.close()
+    return render_template('blacklist.html', blacklist=bl)
+
+@app.route('/blacklist/remove/<int:bid>', methods=['POST'])
+@login_required
+def blacklist_remove(bid):
+    reason = request.form.get('reason', '')
+    conn = get_db()
+    item = conn.execute("SELECT * FROM blacklist WHERE id=?", (bid,)).fetchone()
+    conn.execute("DELETE FROM blacklist WHERE id=?", (bid,))
+    conn.execute("UPDATE members SET is_blacklisted=0 WHERE phone=?", (item['phone'],))
+    conn.commit(); conn.close()
+    log_action('BLACKLIST_REMOVE', 'blacklist', bid, f"Reason: {reason}, Phone: {item['phone']}")
+    flash('Blacklist se remove ho gaya.', 'success')
+    return redirect(url_for('blacklist_view'))
+
+# ================= END FRAUD PREVENTION =================
 
 if __name__ == '__main__':
     init_db()

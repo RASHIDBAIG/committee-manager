@@ -72,7 +72,12 @@
 <td>{% if m.verified %}<span class="badge badge-verified">Verified</span>{% else %}<span class="badge badge-pending">Pending</span>{% endif %}</td>
 <td>
     {% if not m.verified %}<a href="{{ url_for('verify_member', mid=m.id) }}" class="btn btn-success" style="padding:5px 10px;font-size:12px;">Verify</a>{% endif %}
-    <a href="{{ url_for('toggle_defaulter', mid=m.id) }}" class="btn btn-warning" style="padding:5px 10px;font-size:12px;">Defaulter Mark</a>
+    {% if m.is_defaulter == 1 %}
+    <form method="POST" action="{{ url_for('unmark_defaulter', mid=m.id) }}" style="display:inline;"><input type="text" name="reason" placeholder="Wajah" required style="width:80px;font-size:11px;"><button type="submit" class="btn btn-success" style="padding:5px 8px;font-size:11px;">Clear Defaulter</button></form>
+    {% else %}
+    <form method="POST" action="{{ url_for('mark_defaulter', mid=m.id) }}" style="display:inline;" onsubmit="return confirm('Yeh banda BLACKLIST ho jayega. Pakka?')"><input type="text" name="reason" placeholder="Wajah e default" required style="width:80px;font-size:11px;"><button type="submit" class="btn btn-danger" style="padding:5px 8px;font-size:11px;">Mark Defaulter</button></form>
+    {% endif %}
+    <a href="{{ url_for('view_agreement', mid=m.id) }}" class="btn btn-secondary" style="padding:5px 8px;font-size:11px;">📜 Agreement</a>
 </td>
 </tr>{% endfor %}
 </tbody></table>
