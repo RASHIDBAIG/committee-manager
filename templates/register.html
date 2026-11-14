@@ -19,15 +19,23 @@ button:hover{background:#218838}
     <h2>Join Committee</h2>
     <p style="text-align:center;font-size:13px;color:#666;margin-bottom:15px;">Apni details bharein taake Admin aap ko approve kare.</p>
     {% with messages = get_flashed_messages() %}{% if messages %}<div class="flash">{{ messages[0] }}</div>{% endif %}{% endwith %}
-    <form method="POST" enctype="multipart/form-data">
+    <form method="POST" enctype="multipart/form-data" autocomplete="off">
         <label>Pura Naam *</label><input type="text" name="name" required>
         <label>Mobile Number *</label><input type="text" name="phone" placeholder="03XXXXXXXXX" required>
-        <label>Password (Naya Banayein) *</label><input type="password" name="password" required placeholder="Apna Password likhein">
+        <label>Password (Naya Banayein) *</label><input type="password" name="password" required placeholder="Apna Password likhein" autocomplete="new-password">
         <label>CNIC Number</label><input type="text" name="cnic" placeholder="XXXXX-XXXXXXX-X">
         <label>Address (Optional)</label><input type="text" name="address">
         <label>Shobha / Profession (Optional)</label><input type="text" name="profession" placeholder="e.g. Teacher, Business, Job">
         <label>Mahana Aamdani / Monthly Income (Optional)</label><input type="text" name="monthly_income" placeholder="e.g. 50,000">
         <label>Kis Ne Recommend Kya? (Optional)</label><input type="text" name="referred_by" placeholder="Friend/Family member ka naam">
+        
+        <label style="margin-top:15px; color:#1a5490;">Guarantor Ka Naam (Zamin) *</label>
+        <input type="text" name="guarantor_name" required placeholder="Jo aap ki guarantee de">
+        <label>Guarantor Ka Mobile Number *</label>
+        <input type="text" name="guarantor_phone" required placeholder="03XXXXXXXXX">
+        <label>Guarantor Ka CNIC *</label>
+        <input type="text" name="guarantor_cnic" required placeholder="XXXXX-XXXXXXX-X">
+
         <label style="margin-top:15px;">Mahana Qist (Monthly Amount) *</label>
         <select name="preferred_amount" required>
             <option value="5000">Rs. 5,000</option>

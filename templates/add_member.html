@@ -11,8 +11,9 @@
 <label>Address Type</label>
 <select name="address_type"><option value="own">Apna Ghar (Malik)</option><option value="rent">Kiraye Par</option><option value="family">Family ke sath</option></select>
 <div class="row">
-<div class="col-half"><label>Guarantor Naam</label><input type="text" name="guarantor_name"></div>
-<div class="col-half"><label>Guarantor Phone</label><input type="text" name="guarantor_phone"></div>
+<div class="col-half"><label>Guarantor Naam</label><input type="text" name="guarantor_name" required></div>
+<div class="col-half"><label>Guarantor Phone</label><input type="text" name="guarantor_phone" required></div>
+<div class="col-half"><label>Guarantor CNIC</label><input type="text" name="guarantor_cnic" required></div>
 </div>
 <label><input type="checkbox" name="verified" value="1" style="width:auto;margin-right:8px;"> Verified</label><br>
 <button type="submit" class="btn btn-primary">Save Karein</button>

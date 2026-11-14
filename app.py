@@ -3,7 +3,6 @@ import sqlite3, os, uuid, csv, random
 from datetime import datetime
 from functools import wraps
 from werkzeug.security import generate_password_hash, check_password_hash
-from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 app.secret_key = 'committee-secret-2026-change-me'
@@ -22,14 +21,13 @@ def get_db():
 def init_db():
     conn = get_db()
     conn.executescript("""
-        CREATE TABLE IF NOT EXISTS members (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, phone TEXT UNIQUE, password TEXT, plain_password TEXT, cnic TEXT, address TEXT, address_type TEXT, guarantor_name TEXT, guarantor_phone TEXT, verified INTEGER DEFAULT 0, trust_score INTEGER DEFAULT 50, status TEXT DEFAULT 'approved', preferred_amount INTEGER, created_at TEXT, cnic_front TEXT, cnic_back TEXT, selfie TEXT, profession TEXT, monthly_income TEXT, referred_by TEXT, rejection_reason TEXT, is_defaulter INTEGER DEFAULT 0);
+        CREATE TABLE IF NOT EXISTS members (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, phone TEXT UNIQUE, password TEXT, plain_password TEXT, cnic TEXT, address TEXT, address_type TEXT, guarantor_name TEXT, guarantor_phone TEXT, guarantor_cnic TEXT, verified INTEGER DEFAULT 0, trust_score INTEGER DEFAULT 50, status TEXT DEFAULT 'approved', preferred_amount INTEGER, created_at TEXT, cnic_front TEXT, cnic_back TEXT, selfie TEXT, profession TEXT, monthly_income TEXT, referred_by TEXT, rejection_reason TEXT, is_defaulter INTEGER DEFAULT 0);
         CREATE TABLE IF NOT EXISTS committees (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, monthly_amount INTEGER, total_months INTEGER, start_date TEXT, status TEXT DEFAULT 'active', commission_pct INTEGER DEFAULT 2, created_at TEXT);
         CREATE TABLE IF NOT EXISTS committee_members (id INTEGER PRIMARY KEY AUTOINCREMENT, committee_id INTEGER, member_id INTEGER, payout_month INTEGER);
         CREATE TABLE IF NOT EXISTS payments (id INTEGER PRIMARY KEY AUTOINCREMENT, committee_id INTEGER, member_id INTEGER, month_number INTEGER, amount INTEGER, status TEXT DEFAULT 'pending', transaction_id TEXT, screenshot TEXT, paid_at TEXT);
         CREATE TABLE IF NOT EXISTS messages (id INTEGER PRIMARY KEY AUTOINCREMENT, member_id INTEGER, message TEXT, created_at TEXT, is_read INTEGER DEFAULT 0);
     """)
-    # Add missing columns if DB exists
-    for col, dtype in [("status", "TEXT DEFAULT 'approved'"), ("preferred_amount", "INTEGER"), ("cnic_front", "TEXT"), ("cnic_back", "TEXT"), ("selfie", "TEXT"), ("profession", "TEXT"), ("monthly_income", "TEXT"), ("referred_by", "TEXT"), ("password", "TEXT"), ("plain_password", "TEXT"), ("rejection_reason", "TEXT"), ("is_defaulter", "INTEGER DEFAULT 0")]:
+    for col, dtype in [("status", "TEXT DEFAULT 'approved'"), ("preferred_amount", "INTEGER"), ("cnic_front", "TEXT"), ("cnic_back", "TEXT"), ("selfie", "TEXT"), ("profession", "TEXT"), ("monthly_income", "TEXT"), ("referred_by", "TEXT"), ("password", "TEXT"), ("plain_password", "TEXT"), ("rejection_reason", "TEXT"), ("is_defaulter", "INTEGER DEFAULT 0"), ("guarantor_cnic", "TEXT")]:
         try: conn.execute(f"ALTER TABLE members ADD COLUMN {col} {dtype}")
         except sqlite3.OperationalError: pass
     try: conn.execute("ALTER TABLE committees ADD COLUMN commission_pct INTEGER DEFAULT 2")
@@ -71,9 +69,8 @@ def index():
     members = conn.execute("SELECT COUNT(*) c FROM members WHERE status='approved'").fetchone()['c']
     pending_req = conn.execute("SELECT COUNT(*) c FROM members WHERE status='pending'").fetchone()['c']
     committees = conn.execute("SELECT COUNT(*) c FROM committees WHERE status='active'").fetchone()['c']
-    pending_pay = conn.execute("SELECT COUNT(*) c FROM payments WHERE status='pending'").fetchone()['c']
+    pending_pay = conn.execute("SELECT COUNT(*) c FROM payments WHERE status='pending' OR status='submitted'").fetchone()['c']
     
-    # Calculate Total Commission (Approx)
     total_comm = 0
     comm_data = conn.execute("SELECT SUM(p.amount), c.commission_pct FROM payments p JOIN committees c ON p.committee_id=c.id WHERE p.status='paid' GROUP BY c.id").fetchall()
     for row in comm_data:
@@ -152,7 +149,6 @@ def export_csv(cid):
     payments = conn.execute("SELECT p.*, m.name, m.phone FROM payments p JOIN members m ON p.member_id=m.id WHERE p.committee_id=? ORDER BY p.month_number, p.id", (cid,)).fetchall()
     
     def generate():
-        data = csv.writer(Response())
         yield 'Naam,Phone,Month,Amount,Status,TID\n'
         for p in payments:
             yield f"{p['name']},{p['phone']},#{p['month_number']},{p['amount']},{p['status']},{p['transaction_id'] or ''}\n"
@@ -196,7 +192,6 @@ def member_dashboard():
     conn.close()
     return render_template('member_dashboard.html', name=session['member_name'], messages=messages, committees=committees, payments=payments)
 
-# (BAQI ROUTES JAISE LOGIN, REGISTER, COMMITTEE DETAIL, ETC WAISE HI RAHENGE - TRUNCATED FOR BREVITY)
 @app.route('/member_login', methods=['GET', 'POST'])
 def member_login():
     if request.method == 'POST':
@@ -269,17 +264,6 @@ def committees():
     conn = get_db(); rows = conn.execute('SELECT * FROM committees ORDER BY id DESC').fetchall(); conn.close()
     return render_template('committees.html', committees=rows)
 
-@app.route('/committees/create', methods=['GET', 'POST'])
-@login_required
-def create_committee_form():
-    if request.method == 'POST':
-        d = request.form
-        conn = get_db()
-        cur = conn.execute("INSERT INTO committees (name, monthly_amount, total_months, start_date, commission_pct, created_at) VALUES (?,?,?,?,?,?)", (d['name'], int(d['monthly_amount']), int(d['total_months']), d['start_date'], int(d['commission_pct']), datetime.now().isoformat()))
-        conn.commit(); conn.close()
-        return redirect(url_for('committee_detail', cid=cur.lastrowid))
-    return render_template('create_committee.html')
-
 @app.route('/committees/<int:cid>/delete')
 @login_required
 def delete_committee(cid):
@@ -293,10 +277,13 @@ def register():
         conn = get_db()
         try:
             hashed_pw = generate_password_hash(d['password'])
-            conn.execute("INSERT INTO members (name, phone, password, plain_password, cnic, address, preferred_amount, status, created_at, profession, monthly_income, referred_by) VALUES (?,?,?,?,?,?,?,'pending',?,?,?,?)", 
-                (d['name'], d['phone'], hashed_pw, d['password'], d['cnic'], d['address'], d['preferred_amount'], datetime.now().isoformat(), d.get('profession'), d.get('monthly_income'), d.get('referred_by')))
-            conn.commit(); flash('Request bhej di gayi!', 'success'); return redirect(url_for('member_login'))
-        except sqlite3.IntegrityError: flash('Yeh phone number pehle se hai.', 'error')
+            conn.execute("INSERT INTO members (name, phone, password, plain_password, cnic, address, preferred_amount, status, created_at, profession, monthly_income, referred_by, guarantor_name, guarantor_phone, guarantor_cnic) VALUES (?,?,?,?,?,?,?,'pending',?,?,?,?,?,?,?)", 
+                (d['name'], d['phone'], hashed_pw, d['password'], d['cnic'], d['address'], d['preferred_amount'], datetime.now().isoformat(), d.get('profession'), d.get('monthly_income'), d.get('referred_by'), d.get('guarantor_name', ''), d.get('guarantor_phone', ''), d.get('guarantor_cnic', '')))
+            conn.commit()
+            flash('Aap ki request bhej di gayi hai! Admin verify karne ke baad aap login kar sakenge.', 'success')
+            return redirect(url_for('member_login'))
+        except sqlite3.IntegrityError:
+            flash('Yeh phone number pehle se registered hai.', 'error')
         conn.close()
     return render_template('register.html')
 
@@ -308,7 +295,7 @@ def add_member():
         conn = get_db()
         try:
             hashed_pw = generate_password_hash(d['password'])
-            conn.execute("INSERT INTO members (name, phone, password, plain_password, cnic, address, address_type, guarantor_name, guarantor_phone, verified, status, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,'approved',?)", (d['name'], d['phone'], hashed_pw, d['password'], d['cnic'], d['address'], d['address_type'], d['guarantor_name'], d['guarantor_phone'], int(d.get('verified', 0)), datetime.now().isoformat()))
+            conn.execute("INSERT INTO members (name, phone, password, plain_password, cnic, address, address_type, guarantor_name, guarantor_phone, guarantor_cnic, verified, status, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,'approved',?)", (d['name'], d['phone'], hashed_pw, d['password'], d['cnic'], d['address'], d['address_type'], d['guarantor_name'], d['guarantor_phone'], d.get('guarantor_cnic', ''), int(d.get('verified', 0)), datetime.now().isoformat()))
             conn.commit(); flash('Member add ho gaya!', 'success')
         except sqlite3.IntegrityError: flash('Yeh phone number pehle se maujood hai.', 'error')
         conn.close()
