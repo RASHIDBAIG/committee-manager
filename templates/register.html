@@ -35,6 +35,10 @@ button:hover{background:#218838}
         <input type="text" name="guarantor_phone" required placeholder="03XXXXXXXXX">
         <label>Guarantor Ka CNIC *</label>
         <input type="text" name="guarantor_cnic" required placeholder="XXXXX-XXXXXXX-X">
+        <label>Guarantor CNIC Front Picture (Optional)</label>
+        <input type="file" name="guarantor_cnic_front" accept="image/*" capture="environment" class="file-input">
+        <label>Guarantor CNIC Back Picture (Optional)</label>
+        <input type="file" name="guarantor_cnic_back" accept="image/*" capture="environment" class="file-input">
 
         <label style="margin-top:15px;">Mahana Qist (Monthly Amount) *</label>
         <select name="preferred_amount" required>

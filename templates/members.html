@@ -7,7 +7,7 @@
 
 {% if pending_members %}
 <div class="card" style="background-color: #fff3cd; border-left: 5px solid #ffc107;">
-    <h3>🔔 Naye Requests (Pending)</h3>
+    <h3>ðŸ”” Naye Requests (Pending)</h3>
     <table><thead><tr><th>Details</th><th>Qist</th><th>Tasveerein</th><th>Action</th></tr></thead>
     <tbody>{% for m in pending_members %}
     <tr>
@@ -15,6 +15,10 @@
             <strong>{{ m.name }}</strong> ({{ m.phone }})<br>
             <small style="color:#666;">Shobha: {{ m.profession or '-' }} | Income: {{ m.monthly_income or '-' }}</small><br>
             <small style="color:#1a5490; font-weight:bold;">Guarantor: {{ m.guarantor_name }} ({{ m.guarantor_phone }}) - CNIC: {{ m.guarantor_cnic }}</small><br>
+            <div style="margin-top:5px;">
+                {% if m.guarantor_cnic_front %}<a href="{{ url_for('view_image', filename=m.guarantor_cnic_front) }}" target="_blank" class="btn btn-secondary" style="padding:2px 5px;font-size:10px;">Guar. Front</a>{% endif %}
+                {% if m.guarantor_cnic_back %}<a href="{{ url_for('view_image', filename=m.guarantor_cnic_back) }}" target="_blank" class="btn btn-secondary" style="padding:2px 5px;font-size:10px;">Guar. Back</a>{% endif %}
+            </div>
             <small style="color:#666;">Password: {{ m.plain_password or 'Phone Number' }}</small>
         </td>
         <td>Rs. {{ m.preferred_amount }}</td>
@@ -36,7 +40,7 @@
 {% endif %}
 
 <div class="card" style="background-color: #f0f8ff;">
-    <h3>📢 Member Ko Message Bhejein</h3>
+    <h3>ðŸ“¢ Member Ko Message Bhejein</h3>
     <form method="POST" action="{{ url_for('send_message') }}">
         <div class="row">
             <div class="col-half">

@@ -277,8 +277,8 @@ def register():
         conn = get_db()
         try:
             hashed_pw = generate_password_hash(d['password'])
-            conn.execute("INSERT INTO members (name, phone, password, plain_password, cnic, address, preferred_amount, status, created_at, profession, monthly_income, referred_by, guarantor_name, guarantor_phone, guarantor_cnic) VALUES (?,?,?,?,?,?,?,'pending',?,?,?,?,?,?,?)", 
-                (d['name'], d['phone'], hashed_pw, d['password'], d['cnic'], d['address'], d['preferred_amount'], datetime.now().isoformat(), d.get('profession'), d.get('monthly_income'), d.get('referred_by'), d.get('guarantor_name', ''), d.get('guarantor_phone', ''), d.get('guarantor_cnic', '')))
+            conn.execute("INSERT INTO members (name, phone, password, plain_password, cnic, address, preferred_amount, status, created_at, profession, monthly_income, referred_by, guarantor_name, guarantor_phone, guarantor_cnic, guarantor_cnic_front, guarantor_cnic_back) VALUES (?,?,?,?,?,?,?,'pending',?,?,?,?,?,?,?)", 
+                (d['name'], d['phone'], hashed_pw, d['password'], d['cnic'], d['address'], d['preferred_amount'], datetime.now().isoformat(), d.get('profession'), d.get('monthly_income'), d.get('referred_by'), d.get('guarantor_name', ''), d.get('guarantor_phone', ''), d.get('guarantor_cnic', ''), guar_front_name, guar_back_name))
             conn.commit()
             flash('Aap ki request bhej di gayi hai! Admin verify karne ke baad aap login kar sakenge.', 'success')
             return redirect(url_for('member_login'))
