@@ -10,9 +10,8 @@ DB_PATH = os.path.join(os.path.dirname(__file__), 'committee.db')
 SECURE_UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), 'secure_uploads')
 if not os.path.exists(SECURE_UPLOAD_FOLDER): os.makedirs(SECURE_UPLOAD_FOLDER)
 
-# --- ADMIN CREDENTIALS ---
-ADMIN_USERNAME = "admin"     # <-- Apna username yahan change karein
-ADMIN_PASSWORD = "admin123"  # <-- Apna password yahan change karein
+ADMIN_USERNAME = "admin"     
+ADMIN_PASSWORD = "admin123"  
 
 def get_db():
     conn = sqlite3.connect(DB_PATH)
@@ -81,6 +80,48 @@ def members():
     conn.close()
     return render_template('members.html', members=approved_members, pending_members=pending_members)
 
+@app.route('/deleted_members')
+@login_required
+def deleted_members():
+    conn = get_db()
+    deleted = conn.execute("SELECT * FROM members WHERE status='deleted' ORDER BY id DESC").fetchall()
+    conn.close()
+    return render_template('deleted_members.html', deleted_members=deleted)
+
+@app.route('/members/delete/<int:mid>')
+@login_required
+def delete_member_soft(mid):
+    conn = get_db()
+    conn.execute("UPDATE members SET status='deleted' WHERE id=?", (mid,))
+    conn.commit(); conn.close()
+    flash('Member Deleted List mein chala gaya hai.', 'success')
+    return redirect(url_for('members'))
+
+@app.route('/members/restore/<int:mid>')
+@login_required
+def restore_member(mid):
+    conn = get_db()
+    conn.execute("UPDATE members SET status='approved' WHERE id=?", (mid,))
+    conn.commit(); conn.close()
+    flash('Member wapas restore ho gaya!', 'success')
+    return redirect(url_for('deleted_members'))
+
+@app.route('/members/hard_delete/<int:mid>')
+@login_required
+def hard_delete_member(mid):
+    conn = get_db()
+    member = conn.execute("SELECT * FROM members WHERE id=?", (mid,)).fetchone()
+    if member:
+        for img in [member['cnic_front'], member['cnic_back'], member['selfie']]:
+            if img:
+                filepath = os.path.join(SECURE_UPLOAD_FOLDER, img)
+                if os.path.exists(filepath): os.remove(filepath)
+        conn.execute("DELETE FROM members WHERE id=?", (mid,))
+        conn.commit()
+        flash('Member aur uski tasveerein hamesha ke liye delete ho gayin.', 'success')
+    conn.close()
+    return redirect(url_for('deleted_members'))
+
 @app.route('/members/approve/<int:mid>')
 @login_required
 def approve_member(mid):
@@ -93,18 +134,7 @@ def approve_member(mid):
 @app.route('/members/reject/<int:mid>')
 @login_required
 def reject_member(mid):
-    conn = get_db()
-    member = conn.execute("SELECT * FROM members WHERE id=?", (mid,)).fetchone()
-    if member:
-        for img in [member['cnic_front'], member['cnic_back'], member['selfie']]:
-            if img:
-                filepath = os.path.join(SECURE_UPLOAD_FOLDER, img)
-                if os.path.exists(filepath): os.remove(filepath)
-        conn.execute("DELETE FROM members WHERE id=?", (mid,))
-        conn.commit()
-        flash('Request aur uski tasveerein permanently delete kar di gayi hain.', 'success')
-    conn.close()
-    return redirect(url_for('members'))
+    return hard_delete_member(mid)
 
 @app.route('/members/reset_password/<int:mid>', methods=['POST'])
 @login_required
@@ -268,6 +298,9 @@ def member_login():
         if member:
             if member['status'] == 'pending':
                 flash('Aap ki request abhi pending hai. Admin approve karega phir aap login kar sakenge.', 'error')
+                return render_template('member_login.html')
+            if member['status'] == 'deleted':
+                flash('Aap ka account delete kar diya gaya hai. Admin se rabta karein.', 'error')
                 return render_template('member_login.html')
             
             stored_pw = member['password']
