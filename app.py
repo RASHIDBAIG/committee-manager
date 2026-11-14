@@ -19,13 +19,13 @@ def get_db():
 def init_db():
     conn = get_db()
     conn.executescript("""
-        CREATE TABLE IF NOT EXISTS members (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, phone TEXT UNIQUE, password TEXT, cnic TEXT, address TEXT, address_type TEXT, guarantor_name TEXT, guarantor_phone TEXT, verified INTEGER DEFAULT 0, trust_score INTEGER DEFAULT 50, status TEXT DEFAULT 'approved', preferred_amount INTEGER, created_at TEXT, cnic_front TEXT, cnic_back TEXT, selfie TEXT, profession TEXT, monthly_income TEXT, referred_by TEXT);
+        CREATE TABLE IF NOT EXISTS members (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, phone TEXT UNIQUE, password TEXT, plain_password TEXT, cnic TEXT, address TEXT, address_type TEXT, guarantor_name TEXT, guarantor_phone TEXT, verified INTEGER DEFAULT 0, trust_score INTEGER DEFAULT 50, status TEXT DEFAULT 'approved', preferred_amount INTEGER, created_at TEXT, cnic_front TEXT, cnic_back TEXT, selfie TEXT, profession TEXT, monthly_income TEXT, referred_by TEXT);
         CREATE TABLE IF NOT EXISTS committees (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, monthly_amount INTEGER, total_months INTEGER, start_date TEXT, status TEXT DEFAULT 'active', created_at TEXT);
         CREATE TABLE IF NOT EXISTS committee_members (id INTEGER PRIMARY KEY AUTOINCREMENT, committee_id INTEGER, member_id INTEGER, payout_month INTEGER);
         CREATE TABLE IF NOT EXISTS payments (id INTEGER PRIMARY KEY AUTOINCREMENT, committee_id INTEGER, member_id INTEGER, month_number INTEGER, amount INTEGER, status TEXT DEFAULT 'pending', transaction_id TEXT, paid_at TEXT);
         CREATE TABLE IF NOT EXISTS messages (id INTEGER PRIMARY KEY AUTOINCREMENT, member_id INTEGER, message TEXT, created_at TEXT, is_read INTEGER DEFAULT 0);
     """)
-    for col, dtype in [("status", "TEXT DEFAULT 'approved'"), ("preferred_amount", "INTEGER"), ("cnic_front", "TEXT"), ("cnic_back", "TEXT"), ("selfie", "TEXT"), ("profession", "TEXT"), ("monthly_income", "TEXT"), ("referred_by", "TEXT"), ("password", "TEXT")]:
+    for col, dtype in [("status", "TEXT DEFAULT 'approved'"), ("preferred_amount", "INTEGER"), ("cnic_front", "TEXT"), ("cnic_back", "TEXT"), ("selfie", "TEXT"), ("profession", "TEXT"), ("monthly_income", "TEXT"), ("referred_by", "TEXT"), ("password", "TEXT"), ("plain_password", "TEXT")]:
         try: conn.execute(f"ALTER TABLE members ADD COLUMN {col} {dtype}")
         except sqlite3.OperationalError: pass
     conn.commit(); conn.close()
@@ -101,6 +101,17 @@ def reject_member(mid):
     conn.close()
     return redirect(url_for('members'))
 
+@app.route('/members/reset_password/<int:mid>', methods=['POST'])
+@login_required
+def admin_reset_password(mid):
+    new_pw = request.form['new_password']
+    conn = get_db()
+    hashed_pw = generate_password_hash(new_pw)
+    conn.execute("UPDATE members SET password=?, plain_password=? WHERE id=?", (hashed_pw, new_pw, mid))
+    conn.commit(); conn.close()
+    flash('Member ka password kamyabi se reset ho gaya!', 'success')
+    return redirect(url_for('members'))
+
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
@@ -129,8 +140,8 @@ def register():
 
             hashed_pw = generate_password_hash(d['password'])
             
-            conn.execute("INSERT INTO members (name, phone, password, cnic, address, preferred_amount, status, created_at, cnic_front, cnic_back, selfie, profession, monthly_income, referred_by) VALUES (?,?,?,?,?,?,'pending',?,?,?,?,?,?,?)", 
-                (d['name'], d['phone'], hashed_pw, d['cnic'], d['address'], d['preferred_amount'], datetime.now().isoformat(), front_name, back_name, selfie_name, d.get('profession'), d.get('monthly_income'), d.get('referred_by')))
+            conn.execute("INSERT INTO members (name, phone, password, plain_password, cnic, address, preferred_amount, status, created_at, cnic_front, cnic_back, selfie, profession, monthly_income, referred_by) VALUES (?,?,?,?,?,?,?,'pending',?,?,?,?,?,?,?)", 
+                (d['name'], d['phone'], hashed_pw, d['password'], d['cnic'], d['address'], d['preferred_amount'], datetime.now().isoformat(), front_name, back_name, selfie_name, d.get('profession'), d.get('monthly_income'), d.get('referred_by')))
             conn.commit()
             flash('Aap ki request bhej di gayi hai! Admin verify karne ke baad aap login kar sakenge.', 'success')
             return redirect(url_for('member_login'))
@@ -147,7 +158,7 @@ def add_member():
         conn = get_db()
         try:
             hashed_pw = generate_password_hash(d['password'])
-            conn.execute("INSERT INTO members (name, phone, password, cnic, address, address_type, guarantor_name, guarantor_phone, verified, status, created_at) VALUES (?,?,?,?,?,?,?,?,?,'approved',?)", (d['name'], d['phone'], hashed_pw, d['cnic'], d['address'], d['address_type'], d['guarantor_name'], d['guarantor_phone'], int(d.get('verified', 0)), datetime.now().isoformat()))
+            conn.execute("INSERT INTO members (name, phone, password, plain_password, cnic, address, address_type, guarantor_name, guarantor_phone, verified, status, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,'approved',?)", (d['name'], d['phone'], hashed_pw, d['password'], d['cnic'], d['address'], d['address_type'], d['guarantor_name'], d['guarantor_phone'], int(d.get('verified', 0)), datetime.now().isoformat()))
             conn.commit(); flash('Member add ho gaya!', 'success')
         except sqlite3.IntegrityError: flash('Yeh phone number pehle se maujood hai.', 'error')
         conn.close()
@@ -272,6 +283,35 @@ def member_login():
 def member_logout():
     session.pop('member_id', None); session.pop('member_name', None)
     return redirect(url_for('member_login'))
+
+@app.route('/change_member_password', methods=['GET', 'POST'])
+def change_member_password():
+    if 'member_id' not in session:
+        return redirect(url_for('member_login'))
+    
+    if request.method == 'POST':
+        old_pw = request.form['old_password']
+        new_pw = request.form['new_password']
+        
+        conn = get_db()
+        member = conn.execute('SELECT * FROM members WHERE id = ?', (session['member_id'],)).fetchone()
+        
+        stored_pw = member['password']
+        if not stored_pw:
+            stored_pw = generate_password_hash(member['phone'])
+            
+        if check_password_hash(stored_pw, old_pw):
+            new_hashed = generate_password_hash(new_pw)
+            conn.execute('UPDATE members SET password=?, plain_password=? WHERE id=?', (new_hashed, new_pw, member['id']))
+            conn.commit()
+            conn.close()
+            flash('Password kamyabi se change ho gaya!', 'success')
+            return redirect(url_for('member_dashboard'))
+        else:
+            flash('Purana password ghalat hai.', 'error')
+            conn.close()
+            
+    return render_template('change_password.html')
 
 @app.route('/member_dashboard')
 def member_dashboard():
