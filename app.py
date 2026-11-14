@@ -9,7 +9,10 @@ app.secret_key = 'committee-secret-2026-change-me'
 DB_PATH = os.path.join(os.path.dirname(__file__), 'committee.db')
 SECURE_UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), 'secure_uploads')
 if not os.path.exists(SECURE_UPLOAD_FOLDER): os.makedirs(SECURE_UPLOAD_FOLDER)
-ADMIN_PASSWORD = "admin123"
+
+# --- ADMIN CREDENTIALS ---
+ADMIN_USERNAME = "admin"     # <-- Apna username yahan change karein
+ADMIN_PASSWORD = "admin123"  # <-- Apna password yahan change karein
 
 def get_db():
     conn = sqlite3.connect(DB_PATH)
@@ -40,10 +43,12 @@ def login_required(f):
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        if request.form['password'] == ADMIN_PASSWORD:
+        username = request.form['username']
+        password = request.form['password']
+        if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
             session['admin'] = True
             return redirect(url_for('index'))
-        flash('Ghalat password!', 'error')
+        flash('Ghalat Username ya Password!', 'error')
     return render_template('login.html')
 
 @app.route('/logout')

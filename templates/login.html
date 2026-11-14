@@ -2,12 +2,14 @@
 {% block content %}
 <div class="card" style="max-width:400px;margin:80px auto;">
 <h2>Admin Login</h2>
-<form method="POST">
+<form method="POST" autocomplete="off">
+<label>Username</label>
+<input type="text" name="username" required autofocus>
 <label>Password</label>
-<input type="password" name="password" required autofocus>
-<br><br>
+<input type="password" name="password" required>
+<br>
 <button type="submit" class="btn btn-primary" style="width:100%">Login</button>
 </form>
-<p style="margin-top:15px;font-size:12px;color:#888;">Default password: admin123 (app.py mein change karein)</p>
+<p style="margin-top:15px;font-size:12px;color:#888;">Default Username: admin | Password: admin123</p>
 </div>
 {% endblock %}
