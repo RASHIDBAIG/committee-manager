@@ -4,13 +4,15 @@
 <div class="grid">
 <div class="stat"><h3>{{ members }}</h3><p>Total Members</p></div>
 <div class="stat"><h3>{{ committees }}</h3><p>Active Committees</p></div>
+<div class="stat" style="background:#fff3cd;"><h3>{{ pending_req }}</h3><p>Naye Requests</p></div>
 <div class="stat"><h3>{{ pending }}</h3><p>Pending Payments</p></div>
+<div class="stat" style="background:#d4edda;"><h3>Rs. {{ total_comm }}</h3><p>Total Commission</p></div>
 </div>
 <div class="card">
 <h3>Quick Actions</h3>
 <div style="margin-top:15px;">
 <a href="{{ url_for('add_member') }}" class="btn btn-primary">+ Naya Member</a>
-<a href="{{ url_for('create_committee') }}" class="btn btn-success">+ Nayi Committee</a>
+<a href="{{ url_for('create_committee_form') }}" class="btn btn-success">+ Nayi Committee</a>
 <a href="{{ url_for('committees') }}" class="btn btn-secondary">Sab Committees</a>
 </div></div>
 {% endblock %}

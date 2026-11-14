@@ -3,69 +3,15 @@
 <div style="display:flex;justify-content:space-between;align-items:center;">
 <h2>Members ({{ members|length }})</h2>
 <div>
-    <a href="{{ url_for('deleted_members') }}" class="btn btn-secondary" style="margin-right:10px;">🗑️ Deleted / Rejected List</a>
     <a href="{{ url_for('add_member') }}" class="btn btn-primary">+ Naya Member</a>
 </div>
 </div>
-
-{% if pending_members %}
-<div class="card" style="background-color: #fff3cd; border-left: 5px solid #ffc107;">
-    <h3>🔔 Naye Requests (Pending)</h3>
-    <table><thead><tr><th>Details</th><th>Qist</th><th>Tasveerein</th><th>Action</th></tr></thead>
-    <tbody>{% for m in pending_members %}
-    <tr>
-        <td>
-            <strong>{{ m.name }}</strong> ({{ m.phone }})<br>
-            <small style="color:#666;">Shobha: {{ m.profession or '-' }} | Income: {{ m.monthly_income or '-' }}</small><br>
-            <small style="color:#666;">Password: {{ m.plain_password or 'Phone Number' }}</small>
-        </td>
-        <td>Rs. {{ m.preferred_amount }}</td>
-        <td>
-            {% if m.selfie %}<a href="{{ url_for('view_image', filename=m.selfie) }}" target="_blank" class="btn btn-success" style="padding:3px 8px;font-size:11px;margin-bottom:2px;">Selfie</a>{% endif %}
-            {% if m.cnic_front %}<a href="{{ url_for('view_image', filename=m.cnic_front) }}" target="_blank" class="btn btn-secondary" style="padding:3px 8px;font-size:11px;margin-bottom:2px;">CNIC Front</a>{% endif %}
-            {% if m.cnic_back %}<a href="{{ url_for('view_image', filename=m.cnic_back) }}" target="_blank" class="btn btn-secondary" style="padding:3px 8px;font-size:11px;margin-bottom:2px;">CNIC Back</a>{% endif %}
-        </td>
-        <td style="min-width:150px;">
-            <a href="{{ url_for('approve_member', mid=m.id) }}" class="btn btn-success" style="padding:5px 10px;font-size:12px;margin-bottom:5px;display:block;">Approve</a>
-            
-            <form method="POST" action="{{ url_for('reject_member', mid=m.id) }}">
-                <input type="text" name="reason" placeholder="Wajah e reject likhein..." required style="width:100%; padding:4px; font-size:11px; margin-bottom:2px; border:1px solid #ccc; border-radius:3px;">
-                <button type="submit" class="btn btn-danger" style="padding:5px 10px;font-size:12px; width:100%;" onclick="return confirm('Reject kar dein?')">Reject</button>
-            </form>
-        </td>
-    </tr>{% endfor %}
-    </tbody></table>
-</div>
-{% endif %}
-
-<div class="card" style="background-color: #f0f8ff;">
-    <h3>📢 Member Ko Message Bhejein</h3>
-    <form method="POST" action="{{ url_for('send_message') }}">
-        <div class="row">
-            <div class="col-half">
-                <label>Kisko Bhejna Hai?</label>
-                <select name="member_id" required>
-                    <option value="0">Sab Members Ko</option>
-                    {% for m in members %}
-                    <option value="{{ m.id }}">{{ m.name }} Ko</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="col-half">
-                <label>Message</label>
-                <input type="text" name="message" required placeholder="Message likhein...">
-            </div>
-        </div>
-        <br><button type="submit" class="btn btn-primary">Message Bhejein</button>
-    </form>
-</div>
-
 <div class="card">
 {% if members %}
 <table><thead><tr><th>Naam</th><th>Phone</th><th>Password</th><th>Status</th><th>Actions</th></tr></thead>
 <tbody>{% for m in members %}
 <tr>
-<td>{{ m.name }}</td>
+<td>{{ m.name }} {% if m.is_defaulter == 1 %}<span class="badge" style="background:red; color:white;">DEFAULTER</span>{% endif %}</td>
 <td>{{ m.phone }}</td>
 <td>
     <strong>{{ m.plain_password or m.phone }}</strong><br>
@@ -76,8 +22,8 @@
 </td>
 <td>{% if m.verified %}<span class="badge badge-verified">Verified</span>{% else %}<span class="badge badge-pending">Pending</span>{% endif %}</td>
 <td>
-    {% if not m.verified %}<a href="{{ url_for('verify_member', mid=m.id) }}" class="btn btn-success" style="padding:5px 10px;font-size:12px;margin-bottom:2px;">Verify</a>{% endif %}
-    <a href="{{ url_for('delete_member_soft', mid=m.id) }}" class="btn btn-danger" style="padding:5px 10px;font-size:12px;" onclick="return confirm('Member ko Deleted List mein bhejein?')">🗑️ Delete</a>
+    {% if not m.verified %}<a href="{{ url_for('verify_member', mid=m.id) }}" class="btn btn-success" style="padding:5px 10px;font-size:12px;">Verify</a>{% endif %}
+    <a href="{{ url_for('toggle_defaulter', mid=m.id) }}" class="btn btn-warning" style="padding:5px 10px;font-size:12px;">Defaulter Mark</a>
 </td>
 </tr>{% endfor %}
 </tbody></table>

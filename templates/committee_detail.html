@@ -2,38 +2,27 @@
 {% block content %}
 <div class="card">
 <h2>{{ committee.name }}</h2>
-<p style="color:#666;">Rs. {{ committee.monthly_amount }} x {{ committee.total_months }} mahine | Start: {{ committee.start_date }}</p>
+<p style="color:#666;">Rs. {{ committee.monthly_amount }} x {{ committee.total_months }} mahine | Commission: {{ committee.commission_pct }}%</p>
+<div style="margin-top:15px;">
+    <a href="{{ url_for('draw_bari', cid=committee.id) }}" class="btn btn-primary" onclick="return confirm('Sabki bariyan randomly assign ho jayengi. Pakka?')">🎲 Auto Draw Bari</a>
+    <a href="{{ url_for('export_csv', cid=committee.id) }}" class="btn btn-success">📥 Download Excel (CSV)</a>
+</div>
 </div>
 <div class="row">
-<div class="col-half">
-<div class="card">
+<div class="col-half"><div class="card">
 <h3>Members ({{ members_in|length }}/{{ committee.total_months }})</h3>
 {% if members_in %}
-<table><thead><tr><th>Bari</th><th>Naam</th><th>Verified</th><th></th></tr></thead>
-<tbody>{% for cm in members_in %}
-<tr>
-<td><strong>#{{ cm.payout_month }}</strong></td>
-<td>{{ cm.name }}</td>
-<td>{% if cm.verified %}<span class="badge badge-verified">Yes</span>{% else %}<span class="badge badge-pending">No</span>{% endif %}</td>
-<td><a href="{{ url_for('remove_from_committee', cid=committee.id, cmid=cm.id) }}" class="btn btn-danger" style="padding:3px 8px;font-size:11px;" onclick="return confirm('Remove?')">x</a></td>
-</tr>{% endfor %}
-</tbody></table>
+<table><thead><tr><th>Bari</th><th>Naam</th><th>Action</th></tr></thead><tbody>{% for cm in members_in %}
+<tr><td><strong>#{{ cm.payout_month }}</strong></td><td>{{ cm.name }}</td><td><a href="{{ url_for('remove_from_committee', cid=committee.id, cmid=cm.id) }}" class="btn btn-danger" style="padding:3px 8px;font-size:11px;">x</a></td></tr>{% endfor %}</tbody></table>
 {% else %}<p style="color:#888;padding:15px;">Abhi koi member nahi.</p>{% endif %}
 </div></div>
-<div class="col-half">
-<div class="card">
+<div class="col-half"><div class="card">
 <h3>Member Add Karein</h3>
 {% if all_members %}
 <form method="POST" action="{{ url_for('add_to_committee', cid=committee.id) }}">
-<label>Member chunein</label>
-<select name="member_id" required>
-<option value="">-- Chunein --</option>
-{% for m in all_members %}<option value="{{ m.id }}">{{ m.name }} ({{ m.phone }})</option>{% endfor %}
-</select>
-<label>Bari Number (kis mahine paisa milega?)</label>
-<input type="number" name="payout_month" min="1" max="{{ committee.total_months }}" required>
-<br>
-<button type="submit" class="btn btn-success">Add Karein</button>
+<select name="member_id" required><option value="">-- Chunein --</option>{% for m in all_members %}<option value="{{ m.id }}">{{ m.name }} ({{ m.phone }})</option>{% endfor %}</select>
+<input type="number" name="payout_month" placeholder="Bari Number" min="1" max="{{ committee.total_months }}" required style="margin-top:5px;">
+<br><button type="submit" class="btn btn-success" style="margin-top:5px;">Add Karein</button>
 </form>
 {% else %}<p style="color:#888;">Pehle <a href="{{ url_for('add_member') }}">member add karein</a>.</p>{% endif %}
 </div></div>
@@ -42,31 +31,19 @@
 <h3>Payments</h3>
 <form method="POST" action="{{ url_for('add_payment', cid=committee.id) }}" style="background:#f8f9fa;padding:15px;border-radius:6px;margin:15px 0;">
 <div class="row">
-<div class="col-half"><label>Member</label>
-<select name="member_id" required>{% for cm in members_in %}<option value="{{ cm.member_id }}">{{ cm.name }} (#{{ cm.payout_month }})</option>{% endfor %}</select>
-</div>
-<div class="col-half"><label>Month Number</label>
-<input type="number" name="month_number" min="1" max="{{ committee.total_months }}" required></div>
-<div class="col-half"><label>Amount</label>
-<input type="number" name="amount" value="{{ committee.monthly_amount }}" required></div>
-<div class="col-half"><label>Status</label>
-<select name="status"><option value="pending">Pending</option><option value="paid">Paid</option></select></div>
-<div class="col-half"><label>Transaction ID (optional)</label>
-<input type="text" name="transaction_id" placeholder="JazzCash/Bank TID"></div>
-</div>
-<br>
-<button type="submit" class="btn btn-primary">Payment Record Karein</button>
+<div class="col-half"><label>Member</label><select name="member_id" required>{% for cm in members_in %}<option value="{{ cm.member_id }}">{{ cm.name }} (#{{ cm.payout_month }})</option>{% endfor %}</select></div>
+<div class="col-half"><label>Month Number</label><input type="number" name="month_number" min="1" max="{{ committee.total_months }}" required></div>
+<div class="col-half"><label>Amount</label><input type="number" name="amount" value="{{ committee.monthly_amount }}" required></div>
+<div class="col-half"><label>Status</label><select name="status"><option value="pending">Pending</option><option value="paid">Paid</option></select></div>
+</div><br><button type="submit" class="btn btn-primary">Record Karein</button>
 </form>
 {% if payments %}
-<table><thead><tr><th>Month</th><th>Member</th><th>Amount</th><th>Status</th><th>TID</th><th>Action</th></tr></thead>
-<tbody>{% for p in payments %}
-<tr>
-<td>#{{ p.month_number }}</td><td>{{ p.name }}</td><td>Rs. {{ p.amount }}</td>
-<td>{% if p.status == 'paid' %}<span class="badge badge-verified">Paid</span>{% else %}<span class="badge badge-pending">Pending</span>{% endif %}</td>
-<td>{{ p.transaction_id or '-' }}</td>
-<td>{% if p.status != 'paid' %}<a href="{{ url_for('mark_paid', pid=p.id) }}" class="btn btn-success" style="padding:4px 10px;font-size:12px;">Mark Paid</a>{% endif %}</td>
-</tr>{% endfor %}
-</tbody></table>
+<table><thead><tr><th>Month</th><th>Member</th><th>Amount</th><th>Status</th><th>Proof</th><th>Action</th></tr></thead><tbody>{% for p in payments %}
+<tr><td>#{{ p.month_number }}</td><td>{{ p.name }}</td><td>Rs. {{ p.amount }}</td>
+<td>{% if p.status == 'paid' %}<span class="badge badge-verified">Paid</span>{% elif p.status == 'submitted' %}<span class="badge badge-pending">Submitted</span>{% else %}<span class="badge badge-pending">Pending</span>{% endif %}</td>
+<td>{% if p.screenshot %}<a href="/admin/view_image/{{ p.screenshot }}" target="_blank" class="btn btn-secondary" style="padding:3px 8px;font-size:11px;">View Proof</a>{% endif %}</td>
+<td>{% if p.status != 'paid' %}<a href="{{ url_for('approve_payment', pid=p.id) }}" class="btn btn-success" style="padding:4px 10px;font-size:12px;">Approve</a>{% endif %}</td></tr>
+{% endfor %}</tbody></table>
 {% endif %}
 </div>
 {% endblock %}

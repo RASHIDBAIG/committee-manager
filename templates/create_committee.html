@@ -3,12 +3,11 @@
 <div class="card">
 <h2>Nayi Committee Banayein</h2>
 <form method="POST">
-<label>Committee ka Naam *</label><input type="text" name="name" placeholder="Family Committee 2026" required>
+<label>Committee ka Naam *</label><input type="text" name="name" required>
 <label>Monthly Qist (Rs.) *</label><input type="number" name="monthly_amount" value="10000" required>
 <label>Kitne Mahine? *</label><input type="number" name="total_months" value="10" required>
+<label>Aapki Commission (%) *</label><input type="number" name="commission_pct" value="2" min="0" max="20" required>
 <label>Shuruat ki Tareekh *</label><input type="date" name="start_date" required>
-<br>
-<button type="submit" class="btn btn-primary">Committee Banayein</button>
-<a href="{{ url_for('committees') }}" class="btn btn-secondary">Cancel</a>
+<br><button type="submit" class="btn btn-primary">Committee Banayein</button>
 </form></div>
 {% endblock %}
